@@ -1,12 +1,31 @@
-
 import { findShortestPath } from '../services/graph.service.js'
+import { asyncHandler } from '../utils/async_handler.js'
+import { ApiError } from '../utils/api_error.js'
+import { ApiResponse } from '../utils/api_response.js'
 
-export async function getRoute(req, res) {
+export const getRoute = asyncHandler(async (req, res) => {
   const { start, end, wheelchair } = req.query
-  const result = await findShortestPath(
-    parseInt(start),
-    parseInt(end),
-    wheelchair === 'true'
-  )
-  res.json(result)
-}
+
+  if (!start || !end) {
+    throw new ApiError(400, 'start and end node IDs are required query params')
+  }
+
+  const startId = parseInt(start)
+  const endId = parseInt(end)
+
+  if (isNaN(startId) || isNaN(endId)) {
+    throw new ApiError(400, 'start and end must be valid integer node IDs')
+  }
+
+  if (startId === endId) {
+    throw new ApiError(400, 'start and end nodes must be different')
+  }
+
+  const result = await findShortestPath(startId, endId, wheelchair === 'true')
+
+  if (!result || result.distance === Infinity) {
+    throw new ApiError(404, 'No path found between the given nodes — route may be blocked or inaccessible')
+  }
+
+  res.status(200).json(new ApiResponse(200, result, 'Route calculated successfully'))
+})
