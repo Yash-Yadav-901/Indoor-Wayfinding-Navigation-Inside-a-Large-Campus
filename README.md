@@ -236,6 +236,14 @@ node prisma/seed.js
 ```
 
 ### 3. Start Application
+
+#### Option A: Running with Docker (Single Command)
+```bash
+docker compose up --build -d
+```
+The server will build the container, generate Prisma clients, and start on `http://localhost:4000`.
+
+#### Option B: Running Locally with Node.js
 ```bash
 # Development mode
 npm run dev
