@@ -1,0 +1,513 @@
+{
+  "info": {
+    "_postman_id": "c1f734a2-9721-4f1e-84bc-2b5d491c95a7",
+    "name": "Indoor Wayfinding Campus Navigation API",
+    "description": "Complete test suite for all endpoints, Intelligent Query Planner algorithm auto-selection, and admin dynamic controls.",
+    "schema": "https://schema.getpostman.com/json/collection/v2.1.0/collection.json"
+  },
+  "variable": [
+    {
+      "key": "baseUrl",
+      "value": "http://localhost:4000",
+      "type": "string"
+    },
+    {
+      "key": "token",
+      "value": "",
+      "type": "string"
+    }
+  ],
+  "item": [
+    {
+      "name": "1. Health Check",
+      "item": [
+        {
+          "name": "Health Status",
+          "request": {
+            "method": "GET",
+            "header": [],
+            "url": {
+              "raw": "{{baseUrl}}/health",
+              "host": ["{{baseUrl}}"],
+              "path": ["health"]
+            }
+          }
+        }
+      ]
+    },
+    {
+      "name": "2. Authentication",
+      "item": [
+        {
+          "name": "Register Admin User",
+          "request": {
+            "method": "POST",
+            "header": [{ "key": "Content-Type", "value": "application/json" }],
+            "body": {
+              "mode": "raw",
+              "raw": "{\n  \"username\": \"admin_tester\",\n  \"password\": \"Admin@123\",\n  \"role\": \"admin\"\n}"
+            },
+            "url": {
+              "raw": "{{baseUrl}}/api/auth/register",
+              "host": ["{{baseUrl}}"],
+              "path": ["api", "auth", "register"]
+            }
+          }
+        },
+        {
+          "name": "Register Regular User",
+          "request": {
+            "method": "POST",
+            "header": [{ "key": "Content-Type", "value": "application/json" }],
+            "body": {
+              "mode": "raw",
+              "raw": "{\n  \"username\": \"student_tester\",\n  \"password\": \"User@123\",\n  \"role\": \"user\"\n}"
+            },
+            "url": {
+              "raw": "{{baseUrl}}/api/auth/register",
+              "host": ["{{baseUrl}}"],
+              "path": ["api", "auth", "register"]
+            }
+          }
+        },
+        {
+          "name": "Login as Admin (Sets Token)",
+          "event": [
+            {
+              "listen": "test",
+              "script": {
+                "exec": [
+                  "var jsonData = pm.response.json();",
+                  "if (jsonData.data && jsonData.data.token) {",
+                  "    pm.collectionVariables.set('token', jsonData.data.token);",
+                  "    console.log('Token saved:', jsonData.data.token);",
+                  "}"
+                ],
+                "type": "text/javascript"
+              }
+            }
+          ],
+          "request": {
+            "method": "POST",
+            "header": [{ "key": "Content-Type", "value": "application/json" }],
+            "body": {
+              "mode": "raw",
+              "raw": "{\n  \"username\": \"admin\",\n  \"password\": \"Admin@123\"\n}"
+            },
+            "url": {
+              "raw": "{{baseUrl}}/api/auth/login",
+              "host": ["{{baseUrl}}"],
+              "path": ["api", "auth", "login"]
+            }
+          }
+        },
+        {
+          "name": "Login Error - Wrong Password (401)",
+          "request": {
+            "method": "POST",
+            "header": [{ "key": "Content-Type", "value": "application/json" }],
+            "body": {
+              "mode": "raw",
+              "raw": "{\n  \"username\": \"admin\",\n  \"password\": \"WrongPass\"\n}"
+            },
+            "url": {
+              "raw": "{{baseUrl}}/api/auth/login",
+              "host": ["{{baseUrl}}"],
+              "path": ["api", "auth", "login"]
+            }
+          }
+        }
+      ]
+    },
+    {
+      "name": "3. Wayfinding & Routes (Intelligent Query Planner)",
+      "item": [
+        {
+          "name": "Auto-Plan: Cross-Floor Standard (Auto A*)",
+          "request": {
+            "method": "GET",
+            "header": [
+              { "key": "Authorization", "value": "Bearer {{token}}" }
+            ],
+            "url": {
+              "raw": "{{baseUrl}}/api/route?start=1&end=17",
+              "host": ["{{baseUrl}}"],
+              "path": ["api", "route"],
+              "query": [
+                { "key": "start", "value": "1" },
+                { "key": "end", "value": "17" }
+              ]
+            }
+          }
+        },
+        {
+          "name": "Auto-Plan: Intra-Floor Same Level (Auto Floyd-Warshall O(1))",
+          "request": {
+            "method": "GET",
+            "header": [
+              { "key": "Authorization", "value": "Bearer {{token}}" }
+            ],
+            "url": {
+              "raw": "{{baseUrl}}/api/route?start=1&end=6",
+              "host": ["{{baseUrl}}"],
+              "path": ["api", "route"],
+              "query": [
+                { "key": "start", "value": "1" },
+                { "key": "end", "value": "6" }
+              ]
+            }
+          }
+        },
+        {
+          "name": "Auto-Plan: Wheelchair Mode (Auto Dijkstra + MinHeap)",
+          "request": {
+            "method": "GET",
+            "header": [
+              { "key": "Authorization", "value": "Bearer {{token}}" }
+            ],
+            "url": {
+              "raw": "{{baseUrl}}/api/route?start=1&end=17&wheelchair=true",
+              "host": ["{{baseUrl}}"],
+              "path": ["api", "route"],
+              "query": [
+                { "key": "start", "value": "1" },
+                { "key": "end", "value": "17" },
+                { "key": "wheelchair", "value": "true" }
+              ]
+            }
+          }
+        },
+        {
+          "name": "Auto-Plan: Daytime Open Bridge (Auto Dijkstra @ 14:00)",
+          "request": {
+            "method": "GET",
+            "header": [
+              { "key": "Authorization", "value": "Bearer {{token}}" }
+            ],
+            "url": {
+              "raw": "{{baseUrl}}/api/route?start=1&end=22&time=14:00",
+              "host": ["{{baseUrl}}"],
+              "path": ["api", "route"],
+              "query": [
+                { "key": "start", "value": "1" },
+                { "key": "end", "value": "22" },
+                { "key": "time", "value": "14:00" }
+              ]
+            }
+          }
+        },
+        {
+          "name": "Auto-Plan: Nighttime Closed Bridge (Auto Dijkstra @ 23:00 -> 404)",
+          "request": {
+            "method": "GET",
+            "header": [
+              { "key": "Authorization", "value": "Bearer {{token}}" }
+            ],
+            "url": {
+              "raw": "{{baseUrl}}/api/route?start=1&end=22&time=23:00",
+              "host": ["{{baseUrl}}"],
+              "path": ["api", "route"],
+              "query": [
+                { "key": "start", "value": "1" },
+                { "key": "end", "value": "22" },
+                { "key": "time", "value": "23:00" }
+              ]
+            }
+          }
+        },
+        {
+          "name": "Strategy Override: Force Dijkstra",
+          "request": {
+            "method": "GET",
+            "header": [
+              { "key": "Authorization", "value": "Bearer {{token}}" }
+            ],
+            "url": {
+              "raw": "{{baseUrl}}/api/route?start=1&end=17&algorithm=dijkstra",
+              "host": ["{{baseUrl}}"],
+              "path": ["api", "route"],
+              "query": [
+                { "key": "start", "value": "1" },
+                { "key": "end", "value": "17" },
+                { "key": "algorithm", "value": "dijkstra" }
+              ]
+            }
+          }
+        },
+        {
+          "name": "Strategy Override: Force A*",
+          "request": {
+            "method": "GET",
+            "header": [
+              { "key": "Authorization", "value": "Bearer {{token}}" }
+            ],
+            "url": {
+              "raw": "{{baseUrl}}/api/route?start=1&end=17&algorithm=astar",
+              "host": ["{{baseUrl}}"],
+              "path": ["api", "route"],
+              "query": [
+                { "key": "start", "value": "1" },
+                { "key": "end", "value": "17" },
+                { "key": "algorithm", "value": "astar" }
+              ]
+            }
+          }
+        },
+        {
+          "name": "Strategy Override: Force Hierarchical Floyd-Warshall",
+          "request": {
+            "method": "GET",
+            "header": [
+              { "key": "Authorization", "value": "Bearer {{token}}" }
+            ],
+            "url": {
+              "raw": "{{baseUrl}}/api/route?start=1&end=17&algorithm=hierarchical",
+              "host": ["{{baseUrl}}"],
+              "path": ["api", "route"],
+              "query": [
+                { "key": "start", "value": "1" },
+                { "key": "end", "value": "17" },
+                { "key": "algorithm", "value": "hierarchical" }
+              ]
+            }
+          }
+        },
+        {
+          "name": "Nearest Washroom POI",
+          "request": {
+            "method": "GET",
+            "header": [
+              { "key": "Authorization", "value": "Bearer {{token}}" }
+            ],
+            "url": {
+              "raw": "{{baseUrl}}/api/route/nearest-poi?start=1&type=washroom",
+              "host": ["{{baseUrl}}"],
+              "path": ["api", "route", "nearest-poi"],
+              "query": [
+                { "key": "start", "value": "1" },
+                { "key": "type", "value": "washroom" }
+              ]
+            }
+          }
+        },
+        {
+          "name": "Nearest Emergency Exit POI",
+          "request": {
+            "method": "GET",
+            "header": [
+              { "key": "Authorization", "value": "Bearer {{token}}" }
+            ],
+            "url": {
+              "raw": "{{baseUrl}}/api/route/nearest-poi?start=24&type=exit",
+              "host": ["{{baseUrl}}"],
+              "path": ["api", "route", "nearest-poi"],
+              "query": [
+                { "key": "start", "value": "24" },
+                { "key": "type", "value": "exit" }
+              ]
+            }
+          }
+        },
+        {
+          "name": "Multi-Stop Itinerary Route (TSP Heuristic)",
+          "request": {
+            "method": "POST",
+            "header": [
+              { "key": "Authorization", "value": "Bearer {{token}}" },
+              { "key": "Content-Type", "value": "application/json" }
+            ],
+            "body": {
+              "mode": "raw",
+              "raw": "{\n  \"start\": 1,\n  \"stops\": [8, 22],\n  \"end\": 17,\n  \"wheelchair\": false,\n  \"time\": \"14:30\"\n}"
+            },
+            "url": {
+              "raw": "{{baseUrl}}/api/route/multi-stop",
+              "host": ["{{baseUrl}}"],
+              "path": ["api", "route", "multi-stop"]
+            }
+          }
+        }
+      ]
+    },
+    {
+      "name": "4. Admin Dynamic Graph Controls",
+      "item": [
+        {
+          "name": "Get Campus Analytics",
+          "request": {
+            "method": "GET",
+            "header": [
+              { "key": "Authorization", "value": "Bearer {{token}}" }
+            ],
+            "url": {
+              "raw": "{{baseUrl}}/api/admin/analytics",
+              "host": ["{{baseUrl}}"],
+              "path": ["api", "admin", "analytics"]
+            }
+          }
+        },
+        {
+          "name": "Temporarily Close Edge (Corridor/Bridge)",
+          "request": {
+            "method": "PATCH",
+            "header": [
+              { "key": "Authorization", "value": "Bearer {{token}}" },
+              { "key": "Content-Type", "value": "application/json" }
+            ],
+            "body": {
+              "mode": "raw",
+              "raw": "{\n  \"reason\": \"Water pipe leakage repair\"\n}"
+            },
+            "url": {
+              "raw": "{{baseUrl}}/api/admin/edges/10/close",
+              "host": ["{{baseUrl}}"],
+              "path": ["api", "admin", "edges", "10", "close"]
+            }
+          }
+        },
+        {
+          "name": "Reopen Closed Edge",
+          "request": {
+            "method": "PATCH",
+            "header": [
+              { "key": "Authorization", "value": "Bearer {{token}}" },
+              { "key": "Content-Type", "value": "application/json" }
+            ],
+            "body": {
+              "mode": "raw",
+              "raw": "{\n  \"open_hours\": \"07:00-22:00\"\n}"
+            },
+            "url": {
+              "raw": "{{baseUrl}}/api/admin/edges/10/reopen",
+              "host": ["{{baseUrl}}"],
+              "path": ["api", "admin", "edges", "10", "reopen"]
+            }
+          }
+        },
+        {
+          "name": "Set Congestion Multiplier (Peak Traffic)",
+          "request": {
+            "method": "PATCH",
+            "header": [
+              { "key": "Authorization", "value": "Bearer {{token}}" },
+              { "key": "Content-Type", "value": "application/json" }
+            ],
+            "body": {
+              "mode": "raw",
+              "raw": "{\n  \"congestion_weight\": 2.5\n}"
+            },
+            "url": {
+              "raw": "{{baseUrl}}/api/admin/edges/2/congestion",
+              "host": ["{{baseUrl}}"],
+              "path": ["api", "admin", "edges", "2", "congestion"]
+            }
+          }
+        },
+        {
+          "name": "Toggle Edge Accessibility (Lift Maintenance)",
+          "request": {
+            "method": "PATCH",
+            "header": [
+              { "key": "Authorization", "value": "Bearer {{token}}" },
+              { "key": "Content-Type", "value": "application/json" }
+            ],
+            "body": {
+              "mode": "raw",
+              "raw": "{\n  \"is_accessible\": false,\n  \"accessibility_reason\": \"Elevator undergoing monthly inspection\"\n}"
+            },
+            "url": {
+              "raw": "{{baseUrl}}/api/admin/edges/10/accessibility",
+              "host": ["{{baseUrl}}"],
+              "path": ["api", "admin", "edges", "10", "accessibility"]
+            }
+          }
+        }
+      ]
+    },
+    {
+      "name": "5. Campus Nodes Management",
+      "item": [
+        {
+          "name": "List All Nodes",
+          "request": {
+            "method": "GET",
+            "header": [
+              { "key": "Authorization", "value": "Bearer {{token}}" }
+            ],
+            "url": {
+              "raw": "{{baseUrl}}/api/nodes",
+              "host": ["{{baseUrl}}"],
+              "path": ["api", "nodes"]
+            }
+          }
+        },
+        {
+          "name": "Get Node by ID",
+          "request": {
+            "method": "GET",
+            "header": [
+              { "key": "Authorization", "value": "Bearer {{token}}" }
+            ],
+            "url": {
+              "raw": "{{baseUrl}}/api/nodes/1",
+              "host": ["{{baseUrl}}"],
+              "path": ["api", "nodes", "1"]
+            }
+          }
+        }
+      ]
+    },
+    {
+      "name": "6. Campus Edges Management",
+      "item": [
+        {
+          "name": "List All Edges",
+          "request": {
+            "method": "GET",
+            "header": [
+              { "key": "Authorization", "value": "Bearer {{token}}" }
+            ],
+            "url": {
+              "raw": "{{baseUrl}}/api/edges",
+              "host": ["{{baseUrl}}"],
+              "path": ["api", "edges"]
+            }
+          }
+        },
+        {
+          "name": "Get Edge by ID",
+          "request": {
+            "method": "GET",
+            "header": [
+              { "key": "Authorization", "value": "Bearer {{token}}" }
+            ],
+            "url": {
+              "raw": "{{baseUrl}}/api/edges/1",
+              "host": ["{{baseUrl}}"],
+              "path": ["api", "edges", "1"]
+            }
+          }
+        }
+      ]
+    },
+    {
+      "name": "7. Points of Interest (POI)",
+      "item": [
+        {
+          "name": "List All POIs",
+          "request": {
+            "method": "GET",
+            "header": [
+              { "key": "Authorization", "value": "Bearer {{token}}" }
+            ],
+            "url": {
+              "raw": "{{baseUrl}}/api/poi",
+              "host": ["{{baseUrl}}"],
+              "path": ["api", "poi"]
+            }
+          }
+        }
+      ]
+    }
+  ]
+}

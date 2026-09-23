@@ -130,6 +130,22 @@ export class CampusGraph {
     return instructions
   }
 
+  selectOptimalStrategy(startNode, endNode, options = {}) {
+    if (options.algorithm && strategies[options.algorithm.toLowerCase()]) {
+      return strategies[options.algorithm.toLowerCase()]
+    }
+
+    if (options.wheelchair || options.currentTime) {
+      return strategies.dijkstra
+    }
+
+    if (startNode.building === endNode.building && startNode.floor === endNode.floor) {
+      return strategies.hierarchical
+    }
+
+    return strategies.astar
+  }
+
   findPath(startId, endId, options = {}) {
     if (!this.nodes.has(startId)) {
       throw new Error(`Start node ${startId} does not exist`)
@@ -138,8 +154,9 @@ export class CampusGraph {
       throw new Error(`Destination node ${endId} does not exist`)
     }
 
-    const algo = options.algorithm || 'dijkstra'
-    const strategy = strategies[algo.toLowerCase()] || strategies.dijkstra
+    const startNode = this.nodes.get(startId)
+    const endNode = this.nodes.get(endId)
+    const strategy = this.selectOptimalStrategy(startNode, endNode, options)
     const result = strategy.findPath(this, startId, endId, options)
 
     if (!result) return null
