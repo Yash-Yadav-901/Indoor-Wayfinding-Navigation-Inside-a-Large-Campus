@@ -1,0 +1,66 @@
+// schema.prisma
+
+datasource db {
+  provider = "postgresql"
+  url      = env("DATABASE_URL")
+}
+
+generator client {
+  provider = "prisma-client-js"
+}
+
+model Node {
+  id       Int    @id @default(autoincrement())
+  name     String
+  floor    Int
+  building String
+  type     String // room, corridor, lift, exit, washroom
+
+  edgesFrom    Edge[]       @relation("EdgesFrom")
+  edgesTo      Edge[]       @relation("EdgesTo")
+  pois         Poi[]
+  cachedFrom   CachedRoute[] @relation("CachedFrom")
+  cachedTo     CachedRoute[] @relation("CachedTo")
+}
+
+model Edge {
+  id                   Int     @id @default(autoincrement())
+  start_node           Int
+  end_node             Int
+  distance             Float
+  is_accessible        Boolean
+  accessibility_reason String?
+  congestion_weight    Float?  @default(1.0)
+  open_hours           String?
+
+  startNode Node @relation("EdgesFrom", fields: [start_node], references: [id])
+  endNode   Node @relation("EdgesTo", fields: [end_node], references: [id])
+}
+
+model Poi {
+  id          Int     @id @default(autoincrement())
+  node_id     Int
+  type        String  // washroom, exit, cafeteria
+  description String?
+
+  node Node @relation(fields: [node_id], references: [id])
+}
+
+model User {
+  id            Int    @id @default(autoincrement())
+  username      String @unique
+  password_hash String
+  role          String // user, admin
+}
+
+model CachedRoute {
+  id         Int      @id @default(autoincrement())
+  start_node Int
+  end_node   Int
+  path       Json
+  distance   Float
+  created_at DateTime @default(now())
+
+  startNode Node @relation("CachedFrom", fields: [start_node], references: [id])
+  endNode   Node @relation("CachedTo", fields: [end_node], references: [id])
+}
