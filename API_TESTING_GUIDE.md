@@ -5,10 +5,11 @@ This document contains every endpoint, query parameter, request body, headers, e
 ---
 
 ## Quick Start with Postman
-
-1. **Import Collection**: Import `postman_collection.json` directly into Postman.
-2. **Base URL Variable**: `{{baseUrl}}` is preset to `http://localhost:4000`.
-3. **Authentication**: Running **Login as Admin** automatically saves the JWT token into `{{token}}` for all subsequent requests.
+ 
+1. **Demo Video Walkthrough**: [Watch the Demo Video (Google Drive)](https://drive.google.com/file/d/1qmmMr3Z41r3boqQHIG8OpwcSVXKck8UM/view?usp=sharing)
+2. **Import Collection**: Import `postman_collection.json` directly into Postman.
+3. **Base URL Variable**: `{{baseUrl}}` is preset to `http://localhost:4000`.
+4. **Authentication**: Running **Login as Admin** automatically saves the JWT token into `{{token}}` for all subsequent requests.
 
 ---
 

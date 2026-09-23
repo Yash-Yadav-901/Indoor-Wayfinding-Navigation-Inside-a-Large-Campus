@@ -4,6 +4,13 @@ A production-ready RESTful indoor wayfinding API designed for large corporate an
 
 ---
 
+## 🎥 Project Demo Video
+
+- **Google Drive Video Link**: [Watch the Demo Video (Google Drive)](https://drive.google.com/file/d/1qmmMr3Z41r3boqQHIG8OpwcSVXKck8UM/view?usp=sharing)
+- **Local Video File**: [`demo_video/demo_video_f.mp4`](./demo_video/demo_video_f.mp4)
+
+---
+
 ## 1. Problem Statement Overview
 
 Large office campuses and university grounds with multiple interconnected buildings, floors, stairs, and elevators create navigation challenges for new employees, visitors, and emergency services. 
