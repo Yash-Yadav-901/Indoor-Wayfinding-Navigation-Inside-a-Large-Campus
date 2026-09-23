@@ -9,6 +9,7 @@ import nodeRoutes from './routes/nodes.routes.js'
 import edgeRoutes from './routes/edges.routes.js'
 import poiRoutes from './routes/poi.routes.js'
 import routeRoutes from './routes/route.routes.js'
+import adminRoutes from './routes/admin.routes.js'
 import { errorHandler } from './middleware/error.middleware.js'
 
 const app = express()
@@ -28,6 +29,7 @@ app.use('/api/nodes', nodeRoutes)
 app.use('/api/edges', edgeRoutes)
 app.use('/api/poi', poiRoutes)
 app.use('/api/route', routeRoutes)
+app.use('/api/admin', adminRoutes)
 
 app.use(errorHandler)
 

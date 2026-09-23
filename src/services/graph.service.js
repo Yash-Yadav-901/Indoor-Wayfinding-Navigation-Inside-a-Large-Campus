@@ -22,7 +22,10 @@ export class CampusGraph {
   }
 
   isEdgeOpen(openHoursStr, queryTimeStr) {
-    if (!openHoursStr || !queryTimeStr) return true
+    if (!openHoursStr) return true
+    if (openHoursStr === '00:00-00:00' || openHoursStr === 'closed') return false
+
+    if (!queryTimeStr) return true
 
     const parseMinutes = (str) => {
       const [h, m] = str.split(':').map((v) => parseInt(v, 10))
@@ -36,6 +39,7 @@ export class CampusGraph {
     const start = parseMinutes(startStr)
     const end = parseMinutes(endStr)
     if (start === null || end === null) return true
+    if (start === end) return false
 
     if (start <= end) {
       return q >= start && q <= end
