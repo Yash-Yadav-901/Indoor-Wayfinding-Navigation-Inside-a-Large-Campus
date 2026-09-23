@@ -21,10 +21,10 @@ app.use(express.json())
 app.use(express.urlencoded({ extended: true }))
 
 app.get('/health', (req, res) => {
-  res.json({ status: 'ok', timestamp: new Date().toISOString() })
+    res.json({ status: 'ok', timestamp: new Date().toISOString() })
 })
 app.get('/', (req, res) => {
-  res.json({ status: 'indoor wayfinding navigation system is running try some of the apis endpoints to find routes to destination',timestamp: new Date().toISOString() })
+    res.json({ status: 'indoor wayfinding navigation system is running try some of the apis endpoints to find routes to destination', timestamp: new Date().toISOString() })
 })
 
 app.use('/api/auth', authRoutes)
