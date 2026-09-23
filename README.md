@@ -17,7 +17,61 @@ This backend system addresses these challenges by:
 
 ---
 
-## 2. Assumptions Made in System Design
+## 2. How to Run the Project
+
+### Prerequisites
+- Docker & Docker Compose (Recommended) OR Node.js >= 20.0.0
+- PostgreSQL Database (e.g., Neon Postgres)
+- Redis Server (Optional, automatic in-memory fallback active by default)
+
+### Step 1: Configure Environment Variables (`.env`)
+Create a `.env` file in the root directory:
+```env
+DATABASE_URL="postgresql://username:password@host/dbname?sslmode=require"
+REDIS_URL="redis://default:password@host:port"
+JWT_SECRET="your_secure_jwt_secret_key"
+PORT=4000
+NODE_ENV=development
+```
+
+---
+
+### Step 2: Start the Application
+
+#### Option 1: Single Command with Docker (Recommended)
+To build and run the entire containerized application in one command:
+```bash
+docker compose up --build -d
+```
+The application will automatically build the container, generate Prisma database clients, and start the web server on `http://localhost:4000`.
+
+#### Option 2: Running Locally with Node.js
+```bash
+# 1. Install dependencies
+npm install
+
+# 2. Push schema to database and seed campus graph data
+npx prisma db push
+node prisma/seed.js
+
+# 3. Start development server
+npm run dev
+
+# (Alternatively for production)
+npm start
+```
+
+---
+
+### Step 3: Test and Explore the APIs
+After the project starts running on `http://localhost:4000`:
+- **Import Postman Collection**: Import `postman_collection.json` directly into Postman for end-to-end automated testing across all endpoints, auto-selection routes, and error scenarios.
+- **Detailed Testing Manual**: Refer to `API_TESTING_GUIDE.md` for complete request parameter matrices, expected JSON responses, and edge cases.
+- **Root Status Check**: Visit `http://localhost:4000/` or `http://localhost:4000/health` to confirm the server status.
+
+---
+
+## 3. Assumptions Made in System Design
 
 To create a realistic, robust, and computationally sound indoor navigation system, the following core assumptions were established:
 
@@ -43,7 +97,7 @@ To create a realistic, robust, and computationally sound indoor navigation syste
 
 ---
 
-## 3. System Architecture and OOP Design
+## 4. System Architecture and OOP Design
 
 The backend is built with Node.js and Express using strict Layered Architecture and Object-Oriented Programming (OOP) principles.
 
@@ -104,7 +158,7 @@ src/
 
 ---
 
-## 4. Intelligent Query Planner
+## 5. Intelligent Query Planner
 
 Clients make a standard request (`GET /api/route?start=1&end=17`). The backend includes a Query Planner (`selectOptimalStrategy`) that inspects the query context and dispatches the most efficient algorithm:
 
@@ -131,9 +185,9 @@ Clients make a standard request (`GET /api/route?start=1&end=17`). The backend i
 
 ---
 
-## 5. Cost Estimation: Time and Space Complexity
+## 6. Cost Estimation: Time and Space Complexity
 
-### 5.1 Dijkstra with Min-Binary Heap
+### 6.1 Dijkstra with Min-Binary Heap
 - **Time Complexity**: `O((V + E) * log(V))`
   - Binary heap insertion (`enqueue`): `O(log(V))`
   - Extract minimum (`dequeue`): `O(log(V))`
@@ -141,23 +195,23 @@ Clients make a standard request (`GET /api/route?start=1&end=17`). The backend i
 - **Space Complexity**: `O(V + E)` for adjacency storage and distance tracking.
 - **Why this was chosen over a sorted array**: A naive priority queue using `Array.prototype.sort()` takes `O(N * log(N))` on every insert, resulting in an unacceptable `O(E * V * log(V))` total complexity. The binary heap maintains strict `O(log(V))` priority queue bounds.
 
-### 5.2 A* Search Strategy
+### 6.2 A* Search Strategy
 - **Time Complexity**: `O(E')` where `E' <= E` (explores a fraction of the graph by steering towards the goal).
 - **Space Complexity**: `O(V + E)` for tracking open sets and g-scores / f-scores.
 - **Heuristic**: `h(n) = (delta_building * 20) + (abs(delta_floor) * 15)`. The heuristic is admissible (`h(n) <= true walking distance`), guaranteeing optimality.
 
-### 5.3 Hierarchical Floyd-Warshall Strategy
+### 6.3 Hierarchical Floyd-Warshall Strategy
 - **Precomputation Time**: `O(sum(V_sub^3))` where `V_sub` is the number of nodes per floor (for example, `30^3 = 27,000` operations, which executes in under 1 millisecond).
 - **Query Time Complexity**: `O(1)` lookup for intra-floor routes; `O(Gateways^2)` for cross-floor routes.
 - **Space Complexity**: `O(sum(V_sub^2))` to store distance and next-hop matrices per floor.
 
-### 5.4 Multi-Stop TSP Heuristic
+### 6.4 Multi-Stop TSP Heuristic
 - **Time Complexity**: `O(K * (V + E) * log(V))` where `K` is the number of intermediate stops.
 - **Approach**: Evaluates candidate legs using Dijkstra and iteratively visits the nearest unvisited node, then connects to the final destination and stitches the paths.
 
 ---
 
-## 6. Choices and System Trade-offs
+## 7. Choices and System Trade-offs
 
 During the design and implementation of this system, key architectural trade-offs were made:
 
@@ -179,7 +233,7 @@ During the design and implementation of this system, key architectural trade-off
 
 ---
 
-## 7. System Failure Handling and Fault Tolerance
+## 8. System Failure Handling and Fault Tolerance
 
 1. **Multi-Tier Cache Fallback**:
    - `cache.service.js` attempts primary read/write operations against Redis.
@@ -196,7 +250,7 @@ During the design and implementation of this system, key architectural trade-off
 
 ---
 
-## 8. Database Schema and Seed Data
+## 9. Database Schema and Seed Data
 
 ### Relational Entity-Relationship Structure
 
@@ -226,48 +280,6 @@ During the design and implementation of this system, key architectural trade-off
 | **25** | Emergency Exit B | B | 1 | Exit | POI (`exit`) |
 | **26** | Water Point B1 | B | 1 | Washroom | POI (`water_point`) |
 | **32** | HR Department | B | 2 | Room | Upper floor office |
-
----
-
-## 9. How to Run the Project
-
-### Prerequisites
-- Node.js >= 20.0.0 (or Docker / Docker Desktop)
-- PostgreSQL Database (e.g., Neon Postgres)
-- Redis Server (Optional, in-memory fallback active by default)
-
-### 1. Configure Environment (`.env`)
-Create a `.env` file in the root directory:
-```env
-DATABASE_URL="postgresql://username:password@host/dbname?sslmode=require"
-REDIS_URL="redis://default:password@host:port"
-JWT_SECRET="your_secure_jwt_secret_key"
-PORT=4000
-NODE_ENV=development
-```
-
-### 2. Option A: Running with Docker (Single Command)
-To run the complete containerized application in one command:
-```bash
-docker compose up --build -d
-```
-The application will build the container, generate Prisma database clients, and start on `http://localhost:4000`.
-
-### 3. Option B: Running Locally with Node.js
-```bash
-# 1. Install dependencies
-npm install
-
-# 2. Push Prisma schema to database and seed campus graph
-npx prisma db push
-node prisma/seed.js
-
-# 3. Start development server
-npm run dev
-
-# (Alternatively for production)
-npm start
-```
 
 ---
 
