@@ -17,7 +17,33 @@ This backend system addresses these challenges by:
 
 ---
 
-## 2. System Architecture and OOP Design
+## 2. Assumptions Made in System Design
+
+To create a realistic, robust, and computationally sound indoor navigation system, the following core assumptions were established:
+
+1. **Graph Bidirectionality**:
+   - Unless explicitly defined otherwise, indoor corridors, bridges, and doorways are bidirectional walkable edges. Walking from Node A to Node B incurs the same distance as walking from Node B to Node A.
+
+2. **Vertical Transitions and Accessibility**:
+   - Elevators (lifts) and accessible ramps are modeled as accessible edges (`is_accessible: true`).
+   - Stairwells are explicitly flagged as inaccessible to wheelchair users (`is_accessible: false`, `accessibility_reason: "Stairs — use Lift instead"`). When wheelchair mode is active, the router strictly eliminates stair edges.
+
+3. **Time Formatting and Operating Hours**:
+   - Time-restricted corridors and inter-building bridges follow a 24-hour window format: `HH:MM-HH:MM` (for example, `07:00-22:00` for Bridge A-B).
+   - If a request does not specify a `time` query parameter, edges with standard open hours are treated as open unless explicitly closed around-the-clock (`00:00-00:00`).
+
+4. **Congestion Weighting**:
+   - Pedestrian traffic congestion is modeled as an effective cost multiplier: `effective_cost = distance * congestion_weight`. An edge with a 10m distance and 2.0 congestion weight incurs an effective traversal cost equivalent to 20m, naturally steering the shortest-path algorithm toward less crowded corridors.
+
+5. **Multi-Stop Itineraries (TSP Heuristic)**:
+   - When visiting intermediate POI stops on the way to a destination (e.g., Desk to Water Point to Cafeteria to Meeting Room), the optimal sequence is computed using a greedy nearest-neighbor heuristic that minimizes overall walking distance.
+
+6. **Hierarchical Campus Partitioning**:
+   - Campus layouts are partitioned by building and floor. Intra-floor rooms connect locally within floor subgraphs, while elevators, stairs, and bridges act as gateway nodes for inter-floor and inter-building travel.
+
+---
+
+## 3. System Architecture and OOP Design
 
 The backend is built with Node.js and Express using strict Layered Architecture and Object-Oriented Programming (OOP) principles.
 
@@ -78,7 +104,7 @@ src/
 
 ---
 
-## 3. Intelligent Query Planner
+## 4. Intelligent Query Planner
 
 Clients make a standard request (`GET /api/route?start=1&end=17`). The backend includes a Query Planner (`selectOptimalStrategy`) that inspects the query context and dispatches the most efficient algorithm:
 
@@ -99,55 +125,61 @@ Clients make a standard request (`GET /api/route?start=1&end=17`). The backend i
                                 O(1) Matrix Lookup       Target-Directed Search
 ```
 
-- **Intra-Floor Queries (Same Floor & Building)**: Dispatches `FloydWarshallStrategy` to retrieve precomputed shortest paths in $O(1)$ constant time.
+- **Intra-Floor Queries (Same Floor & Building)**: Dispatches `FloydWarshallStrategy` to retrieve precomputed shortest paths in `O(1)` constant time.
 - **Cross-Floor / Cross-Building Queries**: Dispatches `AStarStrategy` using spatial heuristics to explore fewer nodes.
 - **Dynamic Real-World Constraints (`wheelchair=true` or Time Windows)**: Dispatches `DijkstraStrategy` with Min-Binary Heap to evaluate accessibility and open hours on the fly.
 
 ---
 
-## 4. Cost Estimation: Time and Space Complexity
+## 5. Cost Estimation: Time and Space Complexity
 
-### 4.1 Dijkstra with Min-Binary Heap
-- **Time Complexity**: $O((V + E) \log V)$
-  - Binary heap insertion (`enqueue`): $O(\log V)$
-  - Extract minimum (`dequeue`): $O(\log V)$
-  - Edge relaxations: $O(E \log V)$
-- **Space Complexity**: $O(V + E)$ for adjacency storage and distance tracking.
-- **Why this was chosen over a sorted array**: A naive priority queue using `Array.prototype.sort()` takes $O(N \log N)$ on every insert, resulting in an unacceptable $O(E \cdot V \log V)$ total complexity. The binary heap maintains strict $O(\log V)$ priority queue bounds.
+### 5.1 Dijkstra with Min-Binary Heap
+- **Time Complexity**: `O((V + E) * log(V))`
+  - Binary heap insertion (`enqueue`): `O(log(V))`
+  - Extract minimum (`dequeue`): `O(log(V))`
+  - Edge relaxations: `O(E * log(V))`
+- **Space Complexity**: `O(V + E)` for adjacency storage and distance tracking.
+- **Why this was chosen over a sorted array**: A naive priority queue using `Array.prototype.sort()` takes `O(N * log(N))` on every insert, resulting in an unacceptable `O(E * V * log(V))` total complexity. The binary heap maintains strict `O(log(V))` priority queue bounds.
 
-### 4.2 A* Search Strategy
-- **Time Complexity**: $O(E')$ where $E' \le E$ (explores a fraction of the graph by steering towards the goal).
-- **Space Complexity**: $O(V + E)$ for tracking open sets and $g$-scores / $f$-scores.
-- **Heuristic**: $h(n) = \Delta\text{building} \times 20 + |\Delta\text{floor}| \times 15$. The heuristic is admissible ($h(n) \le \text{true walking distance}$), guaranteeing optimality.
+### 5.2 A* Search Strategy
+- **Time Complexity**: `O(E')` where `E' <= E` (explores a fraction of the graph by steering towards the goal).
+- **Space Complexity**: `O(V + E)` for tracking open sets and g-scores / f-scores.
+- **Heuristic**: `h(n) = (delta_building * 20) + (abs(delta_floor) * 15)`. The heuristic is admissible (`h(n) <= true walking distance`), guaranteeing optimality.
 
-### 4.3 Hierarchical Floyd-Warshall Strategy
-- **Precomputation Time**: $O(\sum V_{\text{sub}}^3)$ where $V_{\text{sub}}$ is the number of nodes per floor (e.g., $30^3 = 27,000$ operations, which takes $< 1\text{ms}$).
-- **Query Time Complexity**: $O(1)$ lookup for intra-floor routes; $O(\text{Gateways}^2)$ for cross-floor routes.
-- **Space Complexity**: $O(\sum V_{\text{sub}}^2)$ to store distance and next-hop matrices per floor.
+### 5.3 Hierarchical Floyd-Warshall Strategy
+- **Precomputation Time**: `O(sum(V_sub^3))` where `V_sub` is the number of nodes per floor (for example, `30^3 = 27,000` operations, which executes in under 1 millisecond).
+- **Query Time Complexity**: `O(1)` lookup for intra-floor routes; `O(Gateways^2)` for cross-floor routes.
+- **Space Complexity**: `O(sum(V_sub^2))` to store distance and next-hop matrices per floor.
 
-### 4.4 Multi-Stop TSP Heuristic
-- **Time Complexity**: $O(K \cdot (V + E) \log V)$ where $K$ is the number of intermediate stops.
+### 5.4 Multi-Stop TSP Heuristic
+- **Time Complexity**: `O(K * (V + E) * log(V))` where `K` is the number of intermediate stops.
 - **Approach**: Evaluates candidate legs using Dijkstra and iteratively visits the nearest unvisited node, then connects to the final destination and stitches the paths.
 
 ---
 
-## 5. Real-World Constraints Implementation
+## 6. Choices and System Trade-offs
 
-1. **Wheelchair Accessibility**:
-   - Edges representing stairs have `is_accessible: false` and `accessibility_reason: "Stairs — use Lift instead"`.
-   - When `wheelchair=true`, the router skips all inaccessible edges during relaxation. If no accessible path exists, it returns a 404 response explaining that no wheelchair-accessible route is available.
+During the design and implementation of this system, key architectural trade-offs were made:
 
-2. **Time-Based Corridor and Bridge Closures**:
-   - Edges store operational windows (e.g., `open_hours: "07:00-22:00"` for Bridge A-B; `open_hours: "06:00-21:00"` for the night corridor).
-   - Queries validate the query timestamp against these windows. Edges closed during the requested time are bypassed.
+1. **Precomputation (Floyd-Warshall / Route Cache) vs. Dynamic Edge Relaxation (Dijkstra)**:
+   - *Trade-off*: Precomputing an all-pairs matrix provides instant `O(1)` query lookups. However, in a real campus where doors close at night, elevators undergo maintenance, or wheelchair filters are toggled, full precomputed matrices become stale and invalid.
+   - *Choice*: We chose a hybrid design. We use Dijkstra with dynamic edge relaxation as the primary engine for queries with real-world constraints (wheelchair / operating hours), and limit Floyd-Warshall precomputation to static, intra-floor subgraphs.
 
-3. **Congestion Weighting**:
-   - Edges contain a `congestion_weight` multiplier (e.g., 2.0 for the main cafeteria corridor).
-   - Effective edge traversal cost is calculated as $\text{cost} = \text{distance} \times \text{congestion\_weight}$, causing the algorithm to prefer less crowded alternative corridors when appropriate.
+2. **Relational Database (PostgreSQL + Prisma) vs. Native Graph Database (Neo4j)**:
+   - *Trade-off*: A native graph database offers Cypher queries, but introduces separate infrastructure complexity, looser constraints for user authentication, and high memory overhead for small-to-medium campus networks.
+   - *Choice*: We chose PostgreSQL (via Neon) with Prisma ORM. Relational tables cleanly represent nodes, edges, POIs, and user authentication tables with strict foreign keys and ACID guarantees. In-memory graph services then execute pathfinding algorithms in sub-millisecond times.
+
+3. **Multi-Tier Caching (Redis Primary with In-Memory Fallback) vs. Redis-Only**:
+   - *Trade-off*: A distributed Redis cache provides shared caching across multiple backend instances, but creates a single point of failure if the Redis cluster experiences network partitions.
+   - *Choice*: We implemented a resilient multi-tier cache. Primary read/writes use Redis, while an automatic, transparent failover activates an in-memory TTL cache if Redis is unavailable, guaranteeing 100% uptime for route queries.
+
+4. **Min-Binary Heap vs. Fibonacci Heap vs. Naive Array Sorting**:
+   - *Trade-off*: Fibonacci heaps offer theoretical `O(1)` amortized decrease-key operations, but carry massive practical constant-factor overhead and complex implementation in JavaScript. Naive array sorting degrades performance to `O(E * V * log(V))`.
+   - *Choice*: A standard Min-Binary Heap provides the optimal balance of simplicity, cache locality, and `O(log(V))` priority queue bounds.
 
 ---
 
-## 6. System Failure Handling and Fault Tolerance
+## 7. System Failure Handling and Fault Tolerance
 
 1. **Multi-Tier Cache Fallback**:
    - `cache.service.js` attempts primary read/write operations against Redis.
@@ -161,21 +193,6 @@ Clients make a standard request (`GET /api/route?start=1&end=17`). The backend i
    - Same start and destination node IDs return a structured `400 Bad Request`.
    - Unreachable destination nodes or disconnected subgraphs return a clear `404 Not Found` rather than timing out or crashing.
    - Non-numeric or invalid parameters are intercepted by validation layers before reaching the graph engine.
-
----
-
-## 7. System Trade-offs and Architectural Decisions
-
-1. **Precomputation vs. Dynamic Real-Time Filtering**:
-   - *Precomputing all-pairs paths (Full Floyd-Warshall)* gives $O(1)$ lookups but becomes invalid whenever an edge is closed, congested, or restricted for wheelchair users.
-   - *Decision*: We use Dijkstra with dynamic edge relaxation as the primary engine for constrained queries, and limit Floyd-Warshall precomputation to small, static intra-floor subgraphs.
-
-2. **Relational Database (PostgreSQL + Prisma) vs. Native Graph Database (Neo4j)**:
-   - *Graph DBs* provide native cypher traversals, but add operational complexity, separate infrastructure costs, and looser relational constraints for user authentication and permissions.
-   - *Decision*: PostgreSQL via Neon provides strong relational integrity, ACID transactions for node/edge management, and fast index scans, while the in-memory graph service handles traversals in sub-millisecond execution times.
-
-3. **In-Memory Caching vs. Redis Cluster**:
-   - *Decision*: Dual-layer approach. Redis is used as the primary shared cache for multi-instance deployments, while the in-memory fallback guarantees 100% availability during network partitions or Redis outages.
 
 ---
 
@@ -212,14 +229,15 @@ Clients make a standard request (`GET /api/route?start=1&end=17`). The backend i
 
 ---
 
-## 9. Setup and Execution
+## 9. How to Run the Project
 
 ### Prerequisites
-- Node.js >= 20.0.0
+- Node.js >= 20.0.0 (or Docker / Docker Desktop)
 - PostgreSQL Database (e.g., Neon Postgres)
 - Redis Server (Optional, in-memory fallback active by default)
 
 ### 1. Configure Environment (`.env`)
+Create a `.env` file in the root directory:
 ```env
 DATABASE_URL="postgresql://username:password@host/dbname?sslmode=require"
 REDIS_URL="redis://default:password@host:port"
@@ -228,27 +246,26 @@ PORT=4000
 NODE_ENV=development
 ```
 
-### 2. Install Dependencies, Migrate Database and Seed Data
-```bash
-npm install
-npx prisma db push
-node prisma/seed.js
-```
-
-### 3. Start Application
-
-#### Option A: Running with Docker (Single Command)
+### 2. Option A: Running with Docker (Single Command)
+To run the complete containerized application in one command:
 ```bash
 docker compose up --build -d
 ```
-The server will build the container, generate Prisma clients, and start on `http://localhost:4000`.
+The application will build the container, generate Prisma database clients, and start on `http://localhost:4000`.
 
-#### Option B: Running Locally with Node.js
+### 3. Option B: Running Locally with Node.js
 ```bash
-# Development mode
+# 1. Install dependencies
+npm install
+
+# 2. Push Prisma schema to database and seed campus graph
+npx prisma db push
+node prisma/seed.js
+
+# 3. Start development server
 npm run dev
 
-# Production mode
+# (Alternatively for production)
 npm start
 ```
 
