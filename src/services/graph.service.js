@@ -1,15 +1,18 @@
-
 import { PrismaClient } from '@prisma/client'
+import { cacheGet, cacheSet } from './cache.service.js'
+import { config } from '../config/index.js'
+
 const prisma = new PrismaClient()
 
-// Simple PriorityQueue using a min-heap
+const GRAPH_CACHE_KEY = 'graph:edges'
+
 class PriorityQueue {
   constructor() {
     this.heap = []
   }
   enqueue(node, dist) {
     this.heap.push({ node, dist })
-    this.heap.sort((a, b) => a.dist - b.dist) 
+    this.heap.sort((a, b) => a.dist - b.dist)
   }
   dequeue() {
     return this.heap.shift()
@@ -20,22 +23,29 @@ class PriorityQueue {
 }
 
 async function buildGraph() {
+  const cached = await cacheGet(GRAPH_CACHE_KEY)
+  if (cached) return cached
+
   const edges = await prisma.edge.findMany()
   const graph = {}
+
   edges.forEach(edge => {
     if (!graph[edge.start_node]) graph[edge.start_node] = []
     if (!graph[edge.end_node]) graph[edge.end_node] = []
+
     graph[edge.start_node].push({
       node: edge.end_node,
       weight: edge.distance * (edge.congestion_weight || 1),
-      isAccessible: edge.is_accessible
+      isAccessible: edge.is_accessible,
     })
     graph[edge.end_node].push({
       node: edge.start_node,
       weight: edge.distance * (edge.congestion_weight || 1),
-      isAccessible: edge.is_accessible
+      isAccessible: edge.is_accessible,
     })
   })
+
+  await cacheSet(GRAPH_CACHE_KEY, graph, config.cache.graphTTL)
   return graph
 }
 
@@ -49,6 +59,7 @@ export async function findShortestPath(startId, endId, wheelchair = false) {
     distances[node] = Infinity
     prev[node] = null
   })
+
   distances[startId] = 0
   pq.enqueue(startId, 0)
 
@@ -56,7 +67,7 @@ export async function findShortestPath(startId, endId, wheelchair = false) {
     const { node: current } = pq.dequeue()
     if (parseInt(current) === endId) break
 
-    for (const neighbor of graph[current]) {
+    for (const neighbor of (graph[current] || [])) {
       if (wheelchair && !neighbor.isAccessible) continue
       const alt = distances[current] + neighbor.weight
       if (alt < distances[neighbor.node]) {
