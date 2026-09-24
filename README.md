@@ -213,80 +213,29 @@ Clients make a standard request (`GET /api/route?start=1&end=17`). The backend i
 
 ---
 
-## 6. Cost Estimation: Time and Space Complexity Analysis
+## 6. Cost Estimation: Time and Space Complexity
 
-The system employs mathematically optimized algorithms and custom data structures to minimize both execution latency and memory overhead. Below is the comprehensive breakdown of **Best Case ($\Omega$)**, **Average Case ($\Theta$)**, **Worst Case ($O$)**, and **Space Complexity** for all core operations:
+### 6.1 Dijkstra with Min-Binary Heap
+- **Time Complexity**: `O((V + E) * log(V))`
+  - Binary heap insertion (`enqueue`): `O(log(V))`
+  - Extract minimum (`dequeue`): `O(log(V))`
+  - Edge relaxations: `O(E * log(V))`
+- **Space Complexity**: `O(V + E)` for adjacency storage and distance tracking.
+- **Why this was chosen over a sorted array**: A naive priority queue using `Array.prototype.sort()` takes `O(N * log(N))` on every insert, resulting in an unacceptable `O(E * V * log(V))` total complexity. The binary heap maintains strict `O(log(V))` priority queue bounds.
 
-### 6.1 Complexity Summary Table
+### 6.2 A* Search Strategy
+- **Time Complexity**: `O(E')` where `E' <= E` (explores a fraction of the graph by steering towards the goal).
+- **Space Complexity**: `O(V + E)` for tracking open sets and g-scores / f-scores.
+- **Heuristic**: `h(n) = (delta_building * 20) + (abs(delta_floor) * 15)`. The heuristic is admissible (`h(n) <= true walking distance`), guaranteeing optimality.
 
-| Algorithm / Component | Primary Data Structure | Best Case Time ($\Omega$) | Average Case Time ($\Theta$) | Worst Case Time ($O$) | Space Complexity |
-| :--- | :--- | :---: | :---: | :---: | :---: |
-| **Min-Binary Heap (`enqueue`)** | Array-backed Heap | $\Omega(1)$ | $\Theta(\log V)$ | $\mathcal{O}(\log V)$ | $\mathcal{O}(V)$ |
-| **Min-Binary Heap (`dequeue`)** | Array-backed Heap | $\Omega(\log V)$ | $\Theta(\log V)$ | $\mathcal{O}(\log V)$ | $\mathcal{O}(V)$ |
-| **Dijkstra Strategy** | Adjacency List + Min-Heap | $\Omega(1)$ | $\Theta((V + E) \log V)$ | $\mathcal{O}((V + E) \log V)$ | $\mathcal{O}(V + E)$ |
-| **A\* Search Strategy** | Adjacency List + Min-Heap | $\Omega(d \log V)$ | $\Theta(E' \log V)$ | $\mathcal{O}((V + E) \log V)$ | $\mathcal{O}(V + E)$ |
-| **Floyd-Warshall (Precompute)** | 2D Adjacency Matrices | $\Theta(\sum V_{\text{floor}}^3)$ | $\Theta(\sum V_{\text{floor}}^3)$ | $\mathcal{O}(\sum V_{\text{floor}}^3)$ | $\mathcal{O}(\sum V_{\text{floor}}^2)$ |
-| **Floyd-Warshall (Intra-Floor Query)** | 2D Distance Matrix | $\Omega(1)$ | $\Theta(1)$ | $\mathcal{O}(1)$ | $\mathcal{O}(1)$ |
-| **Floyd-Warshall (Cross-Floor Query)** | Gateway Permutations | $\Omega(1)$ | $\Theta(G^2)$ | $\mathcal{O}(G^2)$ | $\mathcal{O}(G)$ |
-| **Multi-Stop TSP Heuristic** | Min-Heap + Greedy State | $\Omega(K)$ | $\Theta(K(V+E)\log V)$ | $\mathcal{O}(K(V+E)\log V)$ | $\mathcal{O}(V + E)$ |
-| **Multi-Tier Route Cache** | Redis / In-Memory TTL Map | $\Omega(1)$ (Hit) | $\Theta(1)$ (Hit) | $\mathcal{O}((V+E)\log V)$ (Miss) | $\mathcal{O}(C \cdot P)$ |
+### 6.3 Hierarchical Floyd-Warshall Strategy
+- **Precomputation Time**: `O(sum(V_sub^3))` where `V_sub` is the number of nodes per floor (for example, `30^3 = 27,000` operations, which executes in under 1 millisecond).
+- **Query Time Complexity**: `O(1)` lookup for intra-floor routes; `O(Gateways^2)` for cross-floor routes.
+- **Space Complexity**: `O(sum(V_sub^2))` to store distance and next-hop matrices per floor.
 
-*Where:*
-- $V$ = Total campus vertices (nodes)
-- $E$ = Total campus edges (corridors, stairs, lifts, bridges)
-- $E'$ = Edges explored by A\* directed search ($E' \ll E$)
-- $d$ = Shortest path length in hops
-- $G$ = Gateway transition nodes (lifts, stairs, bridges)
-- $K$ = Number of intermediate waypoint stops
-- $C$ = Number of cached unique route queries, $P$ = Average path length
-
----
-
-### 6.2 Detailed Algorithmic Breakdown
-
-#### 1. Custom Min-Binary Heap (`PriorityQueue`)
-- **Implementation**: [`src/utils/priority_queue.js`](./src/utils/priority_queue.js)
-- **Best Case Time**:
-  - `enqueue`: $\Omega(1)$ when the inserted node priority is greater than its parent (no bubble-up).
-  - `dequeue`: $\Omega(\log V)$ to restore heap order via bubble-down.
-  - `peek` / `isEmpty`: $\Omega(1)$.
-- **Average & Worst Case Time**: $\mathcal{O}(\log V)$ for both insertion and extraction across $V$ vertices.
-- **Space Complexity**: $\mathcal{O}(V)$ storing compact node references in contiguous memory arrays.
-- **Optimization Rationale**: Naive priority queues sorting JavaScript arrays on insertion suffer $\mathcal{O}(N \log N)$ per operation, escalating overall Dijkstra complexity to $\mathcal{O}(E \cdot V \log V)$. The custom binary heap guarantees strict logarithmic bounds $\mathcal{O}(\log V)$.
-
-#### 2. Dijkstra's Strategy with Real-World Constraints
-- **Implementation**: [`src/services/algorithms/dijkstra.strategy.js`](./src/services/algorithms/dijkstra.strategy.js)
-- **Best Case Time $\Omega(1)$**: Start node is the destination or immediate neighbor with zero dynamic edge contention.
-- **Average Case Time $\Theta((V + E) \log V)$**: Evaluates dynamic edge filters (wheelchair accessibility checks, operating hours, congestion multipliers) across active branches.
-- **Worst Case Time $\mathcal{O}((V + E) \log V)$**: Destination is in a distant building requiring exploration of all walkable nodes and edges before termination.
-- **Space Complexity $\mathcal{O}(V + E)$**: Stores graph adjacency lists, distances map ($\mathcal{O}(V)$), previous hop map ($\mathcal{O}(V)$), and priority queue heap ($\mathcal{O}(V)$).
-
-#### 3. A* Search Strategy
-- **Implementation**: [`src/services/algorithms/astar.strategy.js`](./src/services/algorithms/astar.strategy.js)
-- **Heuristic Function**: $h(n) = (\Delta \text{Building} \times 20) + (|\Delta \text{Floor}| \times 15)$. The heuristic is strictly **admissible** ($h(n) \le h^*(n)$), never overestimating true walking distance.
-- **Best Case Time $\Omega(d \log V)$**: Straightforward path with zero obstacle detour; the heuristic directs search straight to the goal exploring only $d$ path nodes.
-- **Average Case Time $\Theta(E' \log V)$**: Explores an elliptical subspace ($E' \ll E$), significantly pruning irrelevant campus wings.
-- **Worst Case Time $\mathcal{O}((V + E) \log V)$**: In complex maze-like corridors where heuristic guidance meets closed barriers, gracefully falls back to exploring all connected edges without loss of optimality.
-- **Space Complexity $\mathcal{O}(V + E)$**: Maintains `gScore`, `fScore`, `cameFrom` maps and binary heap open set.
-
-#### 4. Hierarchical Floyd-Warshall Strategy
-- **Implementation**: [`src/services/algorithms/floyd_warshall.strategy.js`](./src/services/algorithms/floyd_warshall.strategy.js)
-- **Precomputation Time $\Theta(\sum V_{\text{floor}}^3)$**: Computed once on server startup for isolated floor subgraphs (e.g., $30^3 = 27,000$ operations $\approx 0.8\text{ms}$).
-- **Intra-Floor Query Time $\mathcal{O}(1)$**: Immediate matrix cell lookup $D[u][v]$ returning distance and path reconstruction in constant time.
-- **Cross-Floor Query Time $\mathcal{O}(G^2)$**: Evaluates $G$ gateway nodes (lifts/stairs) connecting origin and destination floors.
-- **Space Complexity $\mathcal{O}(\sum V_{\text{floor}}^2)$**: Stores distance matrices and next-hop pointers per floor subgraph.
-
-#### 5. Multi-Stop Itinerary Planner (TSP Heuristic)
-- **Implementation**: [`src/controllers/route.controller.js`](./src/controllers/route.controller.js)
-- **Best Case Time $\Omega(K)$**: All stops are collinear or immediate neighbors.
-- **Average & Worst Case Time $\mathcal{O}(K \cdot (V + E) \log V)$**: Computes $K$ sequential nearest-neighbor legs using Dijkstra, selecting the nearest unvisited waypoint before connecting to the final destination.
-- **Space Complexity $\mathcal{O}(V + E)$**: Reuses memory across route legs and stitches waypoints into a unified path response.
-
-#### 6. Multi-Tier Cache Layer
-- **Implementation**: [`src/services/cache.service.js`](./src/services/cache.service.js)
-- **Cache Hit $\Omega(1)$**: Redis/Memory key lookup in under $1\text{ms}$.
-- **Cache Miss $\mathcal{O}((V + E) \log V)$**: Computes route via graph strategy and caches result with a 300-second TTL.
-- **Space Complexity $\mathcal{O}(C \cdot P)$**: Bounded by TTL expiration and memory eviction limits.
+### 6.4 Multi-Stop TSP Heuristic
+- **Time Complexity**: `O(K * (V + E) * log(V))` where `K` is the number of intermediate stops.
+- **Approach**: Evaluates candidate legs using Dijkstra and iteratively visits the nearest unvisited node, then connects to the final destination and stitches the paths.
 
 ---
 
