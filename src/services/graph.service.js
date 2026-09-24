@@ -2,18 +2,11 @@ import { PrismaClient } from '@prisma/client'
 import { cacheGet, cacheSet } from './cache.service.js'
 import { config } from '../config/index.js'
 import { DijkstraStrategy } from './algorithms/dijkstra.strategy.js'
-import { AStarStrategy } from './algorithms/astar.strategy.js'
-import { FloydWarshallStrategy } from './algorithms/floyd_warshall.strategy.js'
 
 const prisma = new PrismaClient()
 const GRAPH_CACHE_KEY = 'graph:campus:all'
 
-const strategies = {
-  dijkstra: new DijkstraStrategy(),
-  astar: new AStarStrategy(),
-  hierarchical: new FloydWarshallStrategy(),
-  'floyd-warshall': new FloydWarshallStrategy(),
-}
+const dijkstra = new DijkstraStrategy()
 
 export class CampusGraph {
   constructor() {
@@ -130,20 +123,8 @@ export class CampusGraph {
     return instructions
   }
 
-  selectOptimalStrategy(startNode, endNode, options = {}) {
-    if (options.algorithm && strategies[options.algorithm.toLowerCase()]) {
-      return strategies[options.algorithm.toLowerCase()]
-    }
-
-    if (options.wheelchair || options.currentTime) {
-      return strategies.dijkstra
-    }
-
-    if (startNode.building === endNode.building && startNode.floor === endNode.floor) {
-      return strategies.hierarchical
-    }
-
-    return strategies.astar
+  selectOptimalStrategy() {
+    return dijkstra
   }
 
   findPath(startId, endId, options = {}) {
@@ -154,9 +135,7 @@ export class CampusGraph {
       throw new Error(`Destination node ${endId} does not exist`)
     }
 
-    const startNode = this.nodes.get(startId)
-    const endNode = this.nodes.get(endId)
-    const strategy = this.selectOptimalStrategy(startNode, endNode, options)
+    const strategy = this.selectOptimalStrategy()
     const result = strategy.findPath(this, startId, endId, options)
 
     if (!result) return null

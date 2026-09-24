@@ -21,9 +21,7 @@ A production-ready RESTful indoor wayfinding API designed for large corporate an
 | **ORM** | **Prisma ORM (v6.x)** | Type-safe database client, schema migrations, and relational seeding |
 | **Caching Layer** | **Redis (ioredis)** | Distributed in-memory route and analytics cache |
 | **Cache Resilience** | **In-Memory TTL Fallback** | Native Map-based memory cache with auto-failover if Redis is unavailable |
-| **Graph Algorithms** | **Dijkstra + Min-Binary Heap** | Shortest-path routing under dynamic constraints (accessibility, time windows) |
-| **Heuristic Search** | **A\* Search Algorithm** | Spatial & floor-admissible heuristic pathfinding across buildings & floors |
-| **All-Pairs Matrix** | **Floyd-Warshall** | Precomputed intra-floor subgraph distance matrices for $O(1)$ lookups |
+| **Graph Algorithms** | **Dijkstra + Min-Binary Heap** | Shortest-path routing under all constraints (accessibility, time windows, congestion) |
 | **Itinerary Planning**| **TSP Heuristic** | Multi-stop shortest-path route sequencing (Greedy Nearest Neighbor) |
 | **Authentication** | **JWT (`jsonwebtoken`)** | Stateless bearer token authentication & Role-Based Access Control (RBAC) |
 | **Security & Hashing**| **bcryptjs & Helmet** | Salted password hashing and HTTP security headers |
@@ -148,9 +146,7 @@ src/
 │   ├── cache.service.js            # Multi-tier caching (Redis with in-memory fallback)
 │   ├── graph.service.js            # CampusGraph engine, Query Planner and instruction builder
 │   └── algorithms/                 # Strategy Pattern routing algorithms
-│       ├── dijkstra.strategy.js    # Dijkstra with binary heap (O((V + E) log V))
-│       ├── astar.strategy.js       # A* search with Euclidean and floor heuristics
-│       └── floyd_warshall.strategy.js # Hierarchical subgraph precomputation
+│       └── dijkstra.strategy.js    # Dijkstra with binary heap (O((V + E) log V))
 ├── controllers/
 │   ├── auth.controller.js          # User registration and authentication handlers
 │   ├── nodes.controller.js         # Node CRUD operations and graph synchronization
@@ -176,7 +172,7 @@ src/
 
 2. **Polymorphism and the Strategy Pattern**:
    - Routing algorithms implement a uniform method interface: `findPath(graph, startId, endId, options)`.
-   - The router dynamically delegates queries to `DijkstraStrategy`, `AStarStrategy`, or `FloydWarshallStrategy` without modifying controller or route layers.
+   - `CampusGraph` delegates all routing to `DijkstraStrategy` via the `selectOptimalStrategy` method, keeping controllers and routes fully decoupled from algorithm internals.
 
 3. **Separation of Concerns**:
    - Controllers handle HTTP validation and response serialization.
@@ -186,30 +182,29 @@ src/
 
 ---
 
-## 5. Intelligent Query Planner
+## 5. Routing Engine
 
-Clients make a standard request (`GET /api/route?start=1&end=17`). The backend includes a Query Planner (`selectOptimalStrategy`) that inspects the query context and dispatches the most efficient algorithm:
+Clients make a standard request (`GET /api/route?start=1&end=17`). All routing is handled by a single, unified `DijkstraStrategy` instance:
 
 ```
                       [ Incoming Route Query ]
                                  |
+                                 v
+                    [ Dijkstra + Min-Binary Heap ]
+                       O((V + E) log V) Dynamic
+                       Edge Relaxation & Filters
+                                 |
            +---------------------+---------------------+
-           |                                           |
-[Dynamic Constraints Active?]              [Standard Static Query]
-(wheelchair=true OR time filter)                       |
-           |                               +-----------+-----------+
-           |                               |                       |
-           v                               v                       v
-    [Dijkstra + MinHeap]          [Same Floor & Wing]    [Cross-Floor/Building]
-  O((V + E) log V) Dynamic                 |                       |
-  Edge Relaxation & Filters                v                       v
-                                   [Floyd-Warshall]            [A* Search]
-                                O(1) Matrix Lookup       Target-Directed Search
+           |                     |                     |
+    [wheelchair=true]      [time filter]        [Standard Query]
+   Skip non-accessible   Skip closed edges    Direct shortest path
+        edges
 ```
 
-- **Intra-Floor Queries (Same Floor & Building)**: Dispatches `FloydWarshallStrategy` to retrieve precomputed shortest paths in `O(1)` constant time.
-- **Cross-Floor / Cross-Building Queries**: Dispatches `AStarStrategy` using spatial heuristics to explore fewer nodes.
-- **Dynamic Real-World Constraints (`wheelchair=true` or Time Windows)**: Dispatches `DijkstraStrategy` with Min-Binary Heap to evaluate accessibility and open hours on the fly.
+- **All Queries**: Dispatched to `DijkstraStrategy` with Min-Binary Heap, guaranteeing optimal shortest-path computation under any combination of constraints.
+- **Wheelchair Mode (`wheelchair=true`)**: Dynamically skips edges where `is_accessible: false` (stairwells), routing exclusively through lifts and ramps.
+- **Time-Restricted Corridors**: Skips edges whose `open_hours` window does not include the requested `time` parameter.
+- **Congestion Weighting**: Edge traversal cost is computed as `distance × congestion_weight`, naturally routing around high-traffic corridors.
 
 ---
 
@@ -223,17 +218,7 @@ Clients make a standard request (`GET /api/route?start=1&end=17`). The backend i
 - **Space Complexity**: `O(V + E)` for adjacency storage and distance tracking.
 - **Why this was chosen over a sorted array**: A naive priority queue using `Array.prototype.sort()` takes `O(N * log(N))` on every insert, resulting in an unacceptable `O(E * V * log(V))` total complexity. The binary heap maintains strict `O(log(V))` priority queue bounds.
 
-### 6.2 A* Search Strategy
-- **Time Complexity**: `O(E')` where `E' <= E` (explores a fraction of the graph by steering towards the goal).
-- **Space Complexity**: `O(V + E)` for tracking open sets and g-scores / f-scores.
-- **Heuristic**: `h(n) = (delta_building * 20) + (abs(delta_floor) * 15)`. The heuristic is admissible (`h(n) <= true walking distance`), guaranteeing optimality.
-
-### 6.3 Hierarchical Floyd-Warshall Strategy
-- **Precomputation Time**: `O(sum(V_sub^3))` where `V_sub` is the number of nodes per floor (for example, `30^3 = 27,000` operations, which executes in under 1 millisecond).
-- **Query Time Complexity**: `O(1)` lookup for intra-floor routes; `O(Gateways^2)` for cross-floor routes.
-- **Space Complexity**: `O(sum(V_sub^2))` to store distance and next-hop matrices per floor.
-
-### 6.4 Multi-Stop TSP Heuristic
+### 6.2 Multi-Stop TSP Heuristic
 - **Time Complexity**: `O(K * (V + E) * log(V))` where `K` is the number of intermediate stops.
 - **Approach**: Evaluates candidate legs using Dijkstra and iteratively visits the nearest unvisited node, then connects to the final destination and stitches the paths.
 
@@ -243,9 +228,9 @@ Clients make a standard request (`GET /api/route?start=1&end=17`). The backend i
 
 During the design and implementation of this system, key architectural trade-offs were made:
 
-1. **Precomputation (Floyd-Warshall / Route Cache) vs. Dynamic Edge Relaxation (Dijkstra)**:
-   - *Trade-off*: Precomputing an all-pairs matrix provides instant `O(1)` query lookups. However, in a real campus where doors close at night, elevators undergo maintenance, or wheelchair filters are toggled, full precomputed matrices become stale and invalid.
-   - *Choice*: We chose a hybrid design. We use Dijkstra with dynamic edge relaxation as the primary engine for queries with real-world constraints (wheelchair / operating hours), and limit Floyd-Warshall precomputation to static, intra-floor subgraphs.
+1. **Single Algorithm (Dijkstra) vs. Multi-Algorithm Strategy Dispatch**:
+   - *Trade-off*: A multi-algorithm approach (A*, Floyd-Warshall, Dijkstra) can theoretically save computation for specific query types. However, it dramatically increases code surface area, cognitive load, and the risk of subtle bugs where wrong strategies are dispatched.
+   - *Choice*: We use a single, well-understood `DijkstraStrategy` for all queries. On a campus-scale graph (30–100 nodes per floor), Dijkstra with a Min-Binary Heap computes any route in sub-millisecond time — making multi-algorithm complexity unjustified. The route cache (Redis/in-memory TTL) absorbs repeated queries with `O(1)` lookups.
 
 2. **Relational Database (PostgreSQL + Prisma) vs. Native Graph Database (Neo4j)**:
    - *Trade-off*: A native graph database offers Cypher queries, but introduces separate infrastructure complexity, looser constraints for user authentication, and high memory overhead for small-to-medium campus networks.
@@ -348,7 +333,7 @@ During the design and implementation of this system, key architectural trade-off
   - `end` (integer, required): Destination node ID (e.g., `17`)
   - `wheelchair` (boolean, optional): `true` to restrict to accessible lifts/ramps
   - `time` (string, optional): Query time formatted as `HH:MM` (e.g., `14:30`)
-  - `algorithm` (string, optional): Manual override (`dijkstra`, `astar`, `hierarchical`)
+  - `algorithm` (string, optional): Reserved for future extensibility (currently always uses `dijkstra`)
 - **Example Call**: `GET /api/route?start=1&end=17&wheelchair=false`
 - **Response**:
   ```json
@@ -366,7 +351,7 @@ During the design and implementation of this system, key architectural trade-off
         "Walk along Corridor A-2-Main towards Meeting Room 4B",
         "Arrive at Meeting Room 4B (Building A, Floor 2)"
       ],
-      "algorithmUsed": "astar",
+      "algorithmUsed": "dijkstra",
       "wheelchair": false,
       "fromCache": false
     },
@@ -430,7 +415,7 @@ During the design and implementation of this system, key architectural trade-off
 | Criterion | Implementation Status | Technical Details & Code References |
 | :--- | :---: | :--- |
 | **1. Authentication** | ✅ **Covered** | • Stateless JWT authentication (`jsonwebtoken`) with role verification (`user` vs `admin`).<br>• Salted password hashing with `bcryptjs`.<br>• Middleware: [`auth.middleware.js`](./src/middleware/auth.middleware.js) protecting routes with `verifyJWT` and `requireRole`. |
-| **2. Cost Estimation (Time & Space)** | ✅ **Covered** | • **Dijkstra + Min-Heap**: $O((V + E) \log V)$ time, $O(V + E)$ space via custom [`PriorityQueue`](./src/utils/priority_queue.js).<br>• **A\* Search**: $O(E')$ with admissible spatial/floor heuristics.<br>• **Floyd-Warshall**: $O(1)$ query lookup via precomputed floor matrices.<br>• **Multi-Stop TSP**: $O(K \cdot (V + E) \log V)$ greedy nearest-neighbor sequencing. |
+| **2. Cost Estimation (Time & Space)** | ✅ **Covered** | • **Dijkstra + Min-Heap**: $O((V + E) \log V)$ time, $O(V + E)$ space via custom [`PriorityQueue`](./src/utils/priority_queue.js).<br>• Binary heap insertion (`enqueue`): $O(\log V)$; Extract minimum (`dequeue`): $O(\log V)$.<br>• **Multi-Stop TSP**: $O(K \cdot (V + E) \log V)$ greedy nearest-neighbor sequencing. |
 | **3. Handling System Failure Cases** | ✅ **Covered** | • Multi-tier resilient caching in [`cache.service.js`](./src/services/cache.service.js) with transparent in-memory fallback if Redis fails.<br>• Graceful process lifecycle & termination handlers (`uncaughtException`, `unhandledRejection`, `SIGTERM`) in [`server.js`](./src/server.js).<br>• Safe handling of disconnected subgraphs and unreachable destinations with `404 Not Found`. |
 | **4. Object-Oriented Design (OOPS)** | ✅ **Covered** | • **Encapsulation**: [`PriorityQueue`](./src/utils/priority_queue.js), [`CampusGraph`](./src/services/graph.service.js).<br>• **Polymorphism / Strategy Pattern**: Strategy interface in [`algorithms/`](./src/services/algorithms/).<br>• **Inheritance**: Custom [`ApiError`](./src/utils/api_error.js) extending `Error`.<br>• **Layered Architecture**: Clean separation between routes, controllers, services, and ORM. |
 | **5. System Trade-offs** | ✅ **Covered** | • Precomputation vs Dynamic Edge Relaxation.<br>• Relational DB (PostgreSQL) vs Graph DB (Neo4j).<br>• Multi-tier Caching vs Redis-only.<br>• Min-Binary Heap vs Fibonacci Heap vs Array sort. (Detailed in Section 7). |
