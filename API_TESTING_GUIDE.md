@@ -1,44 +1,75 @@
-# Campus Indoor Wayfinding API — Testing Guide
+# Campus Indoor Wayfinding API — Complete Testing Guide
 
-This document contains every endpoint, query parameter, request body, headers, expected responses, and edge case scenarios for complete Postman testing.
+This document contains every endpoint, query parameter, request body, headers, expected responses, status codes, and test scenarios for testing the Campus Indoor Wayfinding API in Postman, cURL, or automated testing environments.
 
 ---
 
-## Quick Start with Postman
- 
+## 🚀 Quick Start with Postman
+
 1. **Demo Video Walkthrough**: [Watch the Demo Video (Google Drive)](https://drive.google.com/file/d/1qmmMr3Z41r3boqQHIG8OpwcSVXKck8UM/view?usp=sharing)
-2. **Import Collection**: Import `postman_collection.json` directly into Postman.
-3. **Base URL Variable**: `{{baseUrl}}` is preset to `http://localhost:4000`.
-4. **Authentication**: Running **Login as Admin** automatically saves the JWT token into `{{token}}` for all subsequent requests.
+2. **Import Collection**: Import `postman_collection.json` directly into Postman (**File -> Import**).
+3. **Environment & Variables**:
+   - `{{baseUrl}}`: Set by default to `http://localhost:4000`.
+   - `{{token}}`: Automatically populated when executing the **Login as Admin** request.
+   - `{{userToken}}`: Automatically populated when executing the **Login as Regular User** request.
+   - `{{createdNodeId}}`, `{{createdEdgeId}}`, `{{createdPoiId}}`: Dynamic variables automatically captured from creation responses for testing update and delete flows.
 
 ---
 
-## Campus Reference Map and Key Node IDs (Seeded Data)
+## 🗺️ Campus Reference Map & Key Seeded IDs
 
-| Node ID | Location / Room Name | Building | Floor | Type | Key Features |
+| Node ID | Location / Room Name | Building | Floor | Type | Accessibility & Special Attributes |
 | :--- | :--- | :--- | :--- | :--- | :--- |
-| **1** | Reception | Building A | Floor 1 | Junction | Main entrance |
-| **2** | Main Lobby A | Building A | Floor 1 | Corridor | Central hallway |
+| **1** | Reception | Building A | Floor 1 | Junction | Main entrance junction |
+| **2** | Main Lobby A | Building A | Floor 1 | Corridor | Central connector hub |
 | **6** | Washroom Male F1 | Building A | Floor 1 | Washroom | POI (`washroom`) |
 | **8** | Emergency Exit A | Building A | Floor 1 | Exit | POI (`exit`) |
-| **9** | Stairwell A (F1) | Building A | Floor 1 | Stair | Inaccessible (Stairs) |
-| **10** | Lift A (F1) | Building A | Floor 1 | Lift | Accessible (Elevator) |
-| **11** | Bridge A-B (F1) | Building A | Floor 1 | Junction | Open 07:00–22:00 |
-| **12** | Stairwell A (F2) | Building A | Floor 2 | Stair | Inaccessible (Stairs) |
-| **13** | Lift A (F2) | Building A | Floor 2 | Lift | Accessible (Elevator) |
-| **17** | Meeting Room 4B | Building A | Floor 2 | Room | Destination room |
-| **21** | Lobby B | Building B | Floor 1 | Corridor | Building B entrance |
-| **22** | Cafeteria | Building B | Floor 1 | Room | High Congestion (2.0x), POI |
-| **24** | Conference Hall | Building B | Floor 1 | Room | Large hall |
+| **9** | Stairwell A (F1) | Building A | Floor 1 | Stair | Inaccessible (`is_accessible: false`) |
+| **10** | Lift A (F1) | Building A | Floor 1 | Lift | Wheelchair Accessible Elevator |
+| **11** | Bridge A-B (F1) | Building A | Floor 1 | Junction | Time-restricted passage (`07:00-22:00`) |
+| **12** | Stairwell A (F2) | Building A | Floor 2 | Stair | Inaccessible (`is_accessible: false`) |
+| **13** | Lift A (F2) | Building A | Floor 2 | Lift | Wheelchair Accessible Elevator |
+| **17** | Meeting Room 4B | Building A | Floor 2 | Room | Multi-floor destination room |
+| **21** | Lobby B | Building B | Floor 1 | Corridor | Building B entrance connector |
+| **22** | Cafeteria | Building B | Floor 1 | Room | High Congestion weight (`2.0x`), POI |
+| **24** | Conference Hall | Building B | Floor 1 | Room | Large assembly hall |
 | **25** | Emergency Exit B | Building B | Floor 1 | Exit | POI (`exit`) |
 | **26** | Water Point B1 | Building B | Floor 1 | Washroom | POI (`water_point`) |
-| **32** | HR Department | Building B | Floor 2 | Room | Building B upper floor |
+| **32** | HR Department | Building B | Floor 2 | Room | Building B upper floor destination |
 
 ---
 
-## 1. Authentication Endpoints
+## 1. System Health & Info
 
-### 1.1 Login as Admin (Get Token)
+### 1.1 Root Status Info
+- **Method**: `GET`
+- **URL**: `{{baseUrl}}/`
+- **Auth**: None
+- **Expected Response (`200 OK`)**:
+  ```json
+  {
+    "status": "indoor wayfinding navigation system is running try some of the apis endpoints to find routes to destination",
+    "timestamp": "2026-09-25T10:00:00.000Z"
+  }
+  ```
+
+### 1.2 Health Check
+- **Method**: `GET`
+- **URL**: `{{baseUrl}}/health`
+- **Auth**: None
+- **Expected Response (`200 OK`)**:
+  ```json
+  {
+    "status": "ok",
+    "timestamp": "2026-09-25T10:00:00.000Z"
+  }
+  ```
+
+---
+
+## 2. Authentication Endpoints (`/api/auth`)
+
+### 2.1 Login as Admin (Auto-Sets `{{token}}`)
 - **Method**: `POST`
 - **URL**: `{{baseUrl}}/api/auth/login`
 - **Headers**: `Content-Type: application/json`
@@ -49,7 +80,7 @@ This document contains every endpoint, query parameter, request body, headers, e
     "password": "Admin@123"
   }
   ```
-- **Expected Response (200 OK)**:
+- **Expected Response (`200 OK`)**:
   ```json
   {
     "statusCode": 200,
@@ -66,11 +97,10 @@ This document contains every endpoint, query parameter, request body, headers, e
   }
   ```
 
----
-
-### 1.2 Login as Regular User
+### 2.2 Login as Regular User (Auto-Sets `{{userToken}}`)
 - **Method**: `POST`
 - **URL**: `{{baseUrl}}/api/auth/login`
+- **Headers**: `Content-Type: application/json`
 - **Body**:
   ```json
   {
@@ -78,28 +108,46 @@ This document contains every endpoint, query parameter, request body, headers, e
     "password": "User@123"
   }
   ```
-- **Expected Response (200 OK)**: Returns JWT token with `"role": "user"`.
+- **Expected Response (`200 OK`)**: Returns JWT with `"role": "user"`.
 
----
-
-### 1.3 Register New User
+### 2.3 Register New User
 - **Method**: `POST`
 - **URL**: `{{baseUrl}}/api/auth/register`
+- **Headers**: `Content-Type: application/json`
 - **Body**:
   ```json
   {
-    "username": "student1",
-    "password": "Password@123",
+    "username": "student_tester",
+    "password": "User@123",
     "role": "user"
   }
   ```
-- **Expected Response (201 Created)**: User created successfully.
+- **Expected Response (`201 Created`)**:
+  ```json
+  {
+    "statusCode": 201,
+    "data": {
+      "id": 3,
+      "username": "student_tester",
+      "role": "user"
+    },
+    "message": "User registered successfully",
+    "success": true
+  }
+  ```
 
----
-
-### 1.4 Auth Error: Invalid Password (401)
-- **Body**: `{ "username": "admin", "password": "WrongPassword" }`
-- **Expected Response (401 Unauthorized)**:
+### 2.4 Login Failure (Invalid Credentials)
+- **Method**: `POST`
+- **URL**: `{{baseUrl}}/api/auth/login`
+- **Headers**: `Content-Type: application/json`
+- **Body**:
+  ```json
+  {
+    "username": "admin",
+    "password": "WrongPassword"
+  }
+  ```
+- **Expected Response (`401 Unauthorized`)**:
   ```json
   {
     "statusCode": 401,
@@ -110,15 +158,16 @@ This document contains every endpoint, query parameter, request body, headers, e
 
 ---
 
-## 2. Wayfinding and Shortest Route Endpoints
+## 3. Wayfinding & Shortest Route Endpoints (`/api/route`)
 
-> **Note**: All routing endpoints require `Authorization: Bearer {{token}}`
+> **Note**: All routing endpoints require `Authorization: Bearer {{token}}` (or `{{userToken}}`).
+> The routing engine uses **Dijkstra's Algorithm with a Min-Heap Priority Queue**, evaluating dynamic edge congestion weights, wheelchair accessibility constraints, and time-based open/close windows.
 
-### 2.1 Automated Routing (Intelligent Query Planner)
-Auto-selects optimal strategy (Floyd-Warshall for same-floor, A* for cross-floor, Dijkstra for dynamic filters).
+### 3.1 Standard Routing (Cross-Floor)
+Calculates optimal path across floors taking elevators/stairs as appropriate.
 - **Method**: `GET`
 - **URL**: `{{baseUrl}}/api/route?start=1&end=17`
-- **Expected Response (200 OK)**:
+- **Expected Response (`200 OK`)**:
   ```json
   {
     "statusCode": 200,
@@ -134,7 +183,7 @@ Auto-selects optimal strategy (Floyd-Warshall for same-floor, A* for cross-floor
         "Walk along Corridor A-2-Main towards Meeting Room 4B",
         "Arrive at Meeting Room 4B (Building A, Floor 2)"
       ],
-      "algorithmUsed": "astar",
+      "algorithmUsed": "dijkstra",
       "wheelchair": false,
       "fromCache": false
     },
@@ -145,38 +194,41 @@ Auto-selects optimal strategy (Floyd-Warshall for same-floor, A* for cross-floor
 
 ---
 
-### 2.2 Wheelchair Accessible Route (Auto-Dispatches Dijkstra)
-Skips stairs and routes strictly via elevators and accessible corridors.
-- **Method**: `GET`
-- **URL**: `{{baseUrl}}/api/route?start=1&end=17&wheelchair=true`
-- **Expected Response (200 OK)**:
-  - `path`: `[1, 2, 10, 13, 14, 17]` (Excludes Stairwell `[9, 12]`).
-
----
-
-### 2.3 Intra-Floor Route (Auto-Dispatches Floyd-Warshall O(1))
+### 3.2 Intra-Floor Route (Same Level)
 Reception (1) to Male Washroom (6) on Floor 1.
 - **Method**: `GET`
 - **URL**: `{{baseUrl}}/api/route?start=1&end=6`
-- **Expected Response (200 OK)**:
-  - `"algorithmUsed": "floyd-warshall-subgraph"`, `"distance": 18`.
+- **Expected Response (`200 OK`)**:
+  - `algorithmUsed`: `"dijkstra"`
+  - `distance`: `18`
+  - `path`: `[1, 2, 6]`
 
 ---
 
-### 2.4 Time-Based Closure: Daytime Open (14:00)
-Inter-building Bridge (11 to 21) is OPEN during 07:00–22:00.
+### 3.3 Wheelchair Accessible Route (Dijkstra Filter)
+Filters out stairs (`is_accessible: false`) and strictly routes through elevators and accessible corridors.
+- **Method**: `GET`
+- **URL**: `{{baseUrl}}/api/route?start=1&end=17&wheelchair=true`
+- **Expected Response (`200 OK`)**:
+  - `wheelchair`: `true`
+  - `path`: `[1, 2, 10, 13, 14, 17]` (Excludes Stairwells 9 and 12).
+
+---
+
+### 3.4 Time-Restricted Passage: Daytime Open (14:00)
+Bridge A-B (`open_hours: "07:00-22:00"`) is OPEN at 14:00.
 - **Method**: `GET`
 - **URL**: `{{baseUrl}}/api/route?start=1&end=22&time=14:00`
-- **Expected Response (200 OK)**:
-  - Direct path crossing Bridge A-B to Cafeteria (`[1, 2, 11, 21, 22]`, distance: 63m).
+- **Expected Response (`200 OK`)**:
+  - Returns direct path traversing Bridge A-B to Building B Cafeteria.
 
 ---
 
-### 2.5 Time-Based Closure: Nighttime Closed (23:00)
-Inter-building Bridge is CLOSED at 23:00.
+### 3.5 Time-Restricted Passage: Nighttime Closed (23:00)
+Bridge A-B is CLOSED at 23:00.
 - **Method**: `GET`
 - **URL**: `{{baseUrl}}/api/route?start=1&end=22&time=23:00`
-- **Expected Response (404 Not Found)**:
+- **Expected Response (`404 Not Found`)**:
   ```json
   {
     "statusCode": 404,
@@ -187,63 +239,17 @@ Inter-building Bridge is CLOSED at 23:00.
 
 ---
 
-### 2.6 Edge Case: Same Start and End Node (400)
-- **Method**: `GET`
-- **URL**: `{{baseUrl}}/api/route?start=1&end=1`
-- **Expected Response (400 Bad Request)**:
-  ```json
-  {
-    "statusCode": 400,
-    "message": "start and end nodes must be different",
-    "success": false
-  }
-  ```
+### 3.6 Nearest Point of Interest (POI) Route
+Finds the closest POI of a given type along with the computed navigation path.
+- **Nearest Washroom**: `GET {{baseUrl}}/api/route/nearest-poi?start=1&type=washroom`
+  - **Expected Response (`200 OK`)**: Returns nearest washroom node (Node 6) with path `[1, 2, 6]`.
+- **Nearest Emergency Exit**: `GET {{baseUrl}}/api/route/nearest-poi?start=24&type=exit`
+  - **Expected Response (`200 OK`)**: Returns nearest exit from Conference Hall (Node 25).
 
 ---
 
-## 3. Nearest Point of Interest (POI)
-
-### 3.1 Nearest Washroom from Reception
-- **Method**: `GET`
-- **URL**: `{{baseUrl}}/api/route/nearest-poi?start=1&type=washroom`
-- **Expected Response (200 OK)**:
-  ```json
-  {
-    "statusCode": 200,
-    "data": {
-      "poi": {
-        "id": 1,
-        "node_id": 6,
-        "type": "washroom",
-        "description": "Male washroom — Building A, Floor 1"
-      },
-      "destinationNode": {
-        "id": 6,
-        "name": "Washroom Male F1",
-        "floor": 1,
-        "building": "A"
-      },
-      "distance": 18,
-      "path": [1, 2, 6]
-    },
-    "message": "Nearest washroom located successfully",
-    "success": true
-  }
-  ```
-
----
-
-### 3.2 Nearest Emergency Exit from Conference Hall (24)
-- **Method**: `GET`
-- **URL**: `{{baseUrl}}/api/route/nearest-poi?start=24&type=exit`
-- **Expected Response (200 OK)**: Locates Emergency Exit B (Node 25) at distance 18m.
-
----
-
-## 4. Multi-Stop Itinerary Route (TSP Heuristic)
-
-### 4.1 Plan Multi-Stop Route
-Reception (1) to Emergency Exit A (8) to Cafeteria (22) to Meeting Room 4B (17).
+### 3.7 Multi-Stop Itinerary Route (TSP Heuristic + Dijkstra)
+Solves route planning through multiple waypoints using nearest-neighbor heuristics and Dijkstra path segment calculations.
 - **Method**: `POST`
 - **URL**: `{{baseUrl}}/api/route/multi-stop`
 - **Headers**: `Authorization: Bearer {{token}}`, `Content-Type: application/json`
@@ -257,7 +263,7 @@ Reception (1) to Emergency Exit A (8) to Cafeteria (22) to Meeting Room 4B (17).
     "time": "14:30"
   }
   ```
-- **Expected Response (200 OK)**:
+- **Expected Response (`200 OK`)**:
   ```json
   {
     "statusCode": 200,
@@ -276,12 +282,22 @@ Reception (1) to Emergency Exit A (8) to Cafeteria (22) to Meeting Room 4B (17).
 
 ---
 
-## 5. Admin Dynamic Graph Controls (role: admin)
+### 3.8 Validation Errors (400 Bad Request)
+- **Same Start and End**: `GET {{baseUrl}}/api/route?start=1&end=1`
+  - Response: `"start and end nodes must be different"`
+- **Missing Parameters**: `GET {{baseUrl}}/api/route?start=1`
+  - Response: `"start and end node IDs are required query parameters"`
 
-### 5.1 Campus Graph Analytics
+---
+
+## 4. Admin Dynamic Graph Controls (`/api/admin`)
+
+> **Note**: All endpoints require an admin token (`role: "admin"`). Regular users receive `403 Forbidden`.
+
+### 4.1 Campus Network Analytics
 - **Method**: `GET`
 - **URL**: `{{baseUrl}}/api/admin/analytics`
-- **Expected Response (200 OK)**:
+- **Expected Response (`200 OK`)**:
   ```json
   {
     "statusCode": 200,
@@ -298,54 +314,158 @@ Reception (1) to Emergency Exit A (8) to Cafeteria (22) to Meeting Room 4B (17).
   }
   ```
 
----
-
-### 5.2 Temporarily Close Corridor or Lift
+### 4.2 Temporarily Close Edge
+Sets operating hours to `00:00-00:00` and flushes all routing Redis caches.
 - **Method**: `PATCH`
-- **URL**: `{{baseUrl}}/api/admin/edges/12/close`
+- **URL**: `{{baseUrl}}/api/admin/edges/10/close`
 - **Body**:
   ```json
   {
-    "reason": "Elevator safety inspection"
+    "reason": "Water pipe leakage repair"
   }
   ```
-- **Expected Response (200 OK)**: Edge 12 closed, cache purged automatically.
 
----
-
-### 5.3 Reopen Closed Corridor
+### 4.3 Reopen Closed Edge
+Restores standard open hours and flushes routing caches.
 - **Method**: `PATCH`
-- **URL**: `{{baseUrl}}/api/admin/edges/12/reopen`
+- **URL**: `{{baseUrl}}/api/admin/edges/10/reopen`
 - **Body**:
   ```json
   {
-    "open_hours": null
+    "open_hours": "07:00-22:00"
   }
   ```
-- **Expected Response (200 OK)**: Edge 12 reopened.
 
----
-
-### 5.4 Update Congestion Multiplier
+### 4.4 Set Congestion Multiplier (Peak Traffic)
 - **Method**: `PATCH`
-- **URL**: `{{baseUrl}}/api/admin/edges/1/congestion`
+- **URL**: `{{baseUrl}}/api/admin/edges/2/congestion`
 - **Body**:
   ```json
   {
     "congestion_weight": 2.5
   }
   ```
-- **Expected Response (200 OK)**: Congestion updated, routes automatically adjust distance calculations.
+
+### 4.5 Set Edge Accessibility (Maintenance Mode)
+- **Method**: `PATCH`
+- **URL**: `{{baseUrl}}/api/admin/edges/10/accessibility`
+- **Body**:
+  ```json
+  {
+    "is_accessible": false,
+    "accessibility_reason": "Elevator undergoing monthly inspection"
+  }
+  ```
 
 ---
 
-## 6. Campus Layout CRUD Endpoints
+## 5. Campus Nodes Management (`/api/nodes`)
 
-- `GET /api/nodes` — List all nodes
-- `GET /api/nodes/:id` — Get single node
-- `POST /api/nodes` — Admin add node
-- `PUT /api/nodes/:id` — Admin update node
-- `DELETE /api/nodes/:id` — Admin delete node
-- `GET /api/edges` — List all edges
-- `GET /api/edges/:id` — Get single edge
-- `GET /api/poi` — List all POIs
+| Endpoint | Method | Auth Required | Admin Only | Description |
+| :--- | :--- | :--- | :--- | :--- |
+| `/api/nodes` | `GET` | ✅ Yes | ❌ No | List all nodes (includes POIs & edges) |
+| `/api/nodes/:id` | `GET` | ✅ Yes | ❌ No | Get single node by ID |
+| `/api/nodes` | `POST` | ✅ Yes | ✅ Yes | Create new node |
+| `/api/nodes/:id` | `PUT` | ✅ Yes | ✅ Yes | Update existing node |
+| `/api/nodes/:id` | `DELETE` | ✅ Yes | ✅ Yes | Delete node |
+
+### 5.1 Create Node (Admin)
+- **Method**: `POST`
+- **URL**: `{{baseUrl}}/api/nodes`
+- **Body**:
+  ```json
+  {
+    "name": "Innovation Lab",
+    "floor": 3,
+    "building": "A",
+    "type": "room"
+  }
+  ```
+
+### 5.2 Update Node (Admin)
+- **Method**: `PUT`
+- **URL**: `{{baseUrl}}/api/nodes/{{createdNodeId}}`
+- **Body**:
+  ```json
+  {
+    "name": "AI & Robotics Innovation Lab",
+    "type": "lab"
+  }
+  ```
+
+### 5.3 Delete Node (Admin)
+- **Method**: `DELETE`
+- **URL**: `{{baseUrl}}/api/nodes/{{createdNodeId}}`
+
+---
+
+## 6. Campus Edges Management (`/api/edges`)
+
+| Endpoint | Method | Auth Required | Admin Only | Description |
+| :--- | :--- | :--- | :--- | :--- |
+| `/api/edges` | `GET` | ✅ Yes | ❌ No | List all edges with start & end node info |
+| `/api/edges/:id` | `GET` | ✅ Yes | ❌ No | Get single edge by ID |
+| `/api/edges` | `POST` | ✅ Yes | ✅ Yes | Create new connection between nodes |
+| `/api/edges/:id` | `PUT` | ✅ Yes | ✅ Yes | Update edge weights / properties |
+| `/api/edges/:id` | `DELETE` | ✅ Yes | ✅ Yes | Delete edge |
+
+### 6.1 Create Edge (Admin)
+- **Method**: `POST`
+- **URL**: `{{baseUrl}}/api/edges`
+- **Body**:
+  ```json
+  {
+    "start_node": 1,
+    "end_node": 3,
+    "distance": 12.5,
+    "is_accessible": true,
+    "open_hours": null,
+    "congestion_weight": 1.0
+  }
+  ```
+
+### 6.2 Update Edge (Admin)
+- **Method**: `PUT`
+- **URL**: `{{baseUrl}}/api/edges/{{createdEdgeId}}`
+- **Body**:
+  ```json
+  {
+    "distance": 11.0,
+    "congestion_weight": 1.2
+  }
+  ```
+
+### 6.3 Delete Edge (Admin)
+- **Method**: `DELETE`
+- **URL**: `{{baseUrl}}/api/edges/{{createdEdgeId}}`
+
+---
+
+## 7. Points of Interest (POI) Management (`/api/poi`)
+
+| Endpoint | Method | Auth Required | Admin Only | Description |
+| :--- | :--- | :--- | :--- | :--- |
+| `/api/poi` | `GET` | ✅ Yes | ❌ No | List all campus POIs |
+| `/api/poi/nearest` | `GET` | ✅ Yes | ❌ No | Query POIs by type and node reference |
+| `/api/poi` | `POST` | ✅ Yes | ✅ Yes | Create new POI associated with a node |
+| `/api/poi/:id` | `DELETE` | ✅ Yes | ✅ Yes | Delete POI |
+
+### 7.1 Lookup Nearest POIs
+- **Method**: `GET`
+- **URL**: `{{baseUrl}}/api/poi/nearest?node_id=1&type=washroom`
+
+### 7.2 Create POI (Admin)
+- **Method**: `POST`
+- **URL**: `{{baseUrl}}/api/poi`
+- **Body**:
+  ```json
+  {
+    "node_id": 2,
+    "type": "information_desk",
+    "description": "Main floor customer information kiosk"
+  }
+  ```
+
+### 7.3 Delete POI (Admin)
+- **Method**: `DELETE`
+- **URL**: `{{baseUrl}}/api/poi/{{createdPoiId}}`

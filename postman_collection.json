@@ -2,8 +2,18 @@
   "info": {
     "_postman_id": "c1f734a2-9721-4f1e-84bc-2b5d491c95a7",
     "name": "Indoor Wayfinding Campus Navigation API",
-    "description": "Complete test suite for all endpoints, Intelligent Query Planner algorithm auto-selection, and admin dynamic controls.",
+    "description": "Complete test suite for all Campus Indoor Wayfinding API endpoints: Authentication, Graph Routing with Dijkstra's Algorithm (Min-Heap Priority Queue, Congestion Weights, Accessibility Filters, Operating Hours), Nearest POI, Multi-Stop TSP, Node/Edge/POI CRUD, and Admin Dynamic Graph Controls.",
     "schema": "https://schema.getpostman.com/json/collection/v2.1.0/collection.json"
+  },
+  "auth": {
+    "type": "bearer",
+    "bearer": [
+      {
+        "key": "token",
+        "value": "{{token}}",
+        "type": "string"
+      }
+    ]
   },
   "variable": [
     {
@@ -15,15 +25,54 @@
       "key": "token",
       "value": "",
       "type": "string"
+    },
+    {
+      "key": "adminToken",
+      "value": "",
+      "type": "string"
+    },
+    {
+      "key": "userToken",
+      "value": "",
+      "type": "string"
+    },
+    {
+      "key": "createdNodeId",
+      "value": "35",
+      "type": "string"
+    },
+    {
+      "key": "createdEdgeId",
+      "value": "37",
+      "type": "string"
+    },
+    {
+      "key": "createdPoiId",
+      "value": "10",
+      "type": "string"
     }
   ],
   "item": [
     {
-      "name": "1. Health Check",
+      "name": "1. System Health & Info",
       "item": [
         {
-          "name": "Health Status",
+          "name": "Root Status Info",
           "request": {
+            "auth": { "type": "noauth" },
+            "method": "GET",
+            "header": [],
+            "url": {
+              "raw": "{{baseUrl}}/",
+              "host": ["{{baseUrl}}"],
+              "path": [""]
+            }
+          }
+        },
+        {
+          "name": "Health Check",
+          "request": {
+            "auth": { "type": "noauth" },
             "method": "GET",
             "header": [],
             "url": {
@@ -41,8 +90,11 @@
         {
           "name": "Register Admin User",
           "request": {
+            "auth": { "type": "noauth" },
             "method": "POST",
-            "header": [{ "key": "Content-Type", "value": "application/json" }],
+            "header": [
+              { "key": "Content-Type", "value": "application/json" }
+            ],
             "body": {
               "mode": "raw",
               "raw": "{\n  \"username\": \"admin_tester\",\n  \"password\": \"Admin@123\",\n  \"role\": \"admin\"\n}"
@@ -57,8 +109,11 @@
         {
           "name": "Register Regular User",
           "request": {
+            "auth": { "type": "noauth" },
             "method": "POST",
-            "header": [{ "key": "Content-Type", "value": "application/json" }],
+            "header": [
+              { "key": "Content-Type", "value": "application/json" }
+            ],
             "body": {
               "mode": "raw",
               "raw": "{\n  \"username\": \"student_tester\",\n  \"password\": \"User@123\",\n  \"role\": \"user\"\n}"
@@ -71,7 +126,7 @@
           }
         },
         {
-          "name": "Login as Admin (Sets Token)",
+          "name": "Login as Admin (Sets Active Token to Admin)",
           "event": [
             {
               "listen": "test",
@@ -80,7 +135,10 @@
                   "var jsonData = pm.response.json();",
                   "if (jsonData.data && jsonData.data.token) {",
                   "    pm.collectionVariables.set('token', jsonData.data.token);",
-                  "    console.log('Token saved:', jsonData.data.token);",
+                  "    pm.collectionVariables.set('adminToken', jsonData.data.token);",
+                  "    pm.environment.set('token', jsonData.data.token);",
+                  "    pm.globals.set('token', jsonData.data.token);",
+                  "    console.log('Admin Token saved to active {{token}}');",
                   "}"
                 ],
                 "type": "text/javascript"
@@ -88,8 +146,11 @@
             }
           ],
           "request": {
+            "auth": { "type": "noauth" },
             "method": "POST",
-            "header": [{ "key": "Content-Type", "value": "application/json" }],
+            "header": [
+              { "key": "Content-Type", "value": "application/json" }
+            ],
             "body": {
               "mode": "raw",
               "raw": "{\n  \"username\": \"admin\",\n  \"password\": \"Admin@123\"\n}"
@@ -102,10 +163,50 @@
           }
         },
         {
+          "name": "Login as Regular User (Sets Active Token to User)",
+          "event": [
+            {
+              "listen": "test",
+              "script": {
+                "exec": [
+                  "var jsonData = pm.response.json();",
+                  "if (jsonData.data && jsonData.data.token) {",
+                  "    pm.collectionVariables.set('token', jsonData.data.token);",
+                  "    pm.collectionVariables.set('userToken', jsonData.data.token);",
+                  "    pm.environment.set('token', jsonData.data.token);",
+                  "    pm.globals.set('token', jsonData.data.token);",
+                  "    console.log('Regular User Token saved to active {{token}}');",
+                  "}"
+                ],
+                "type": "text/javascript"
+              }
+            }
+          ],
+          "request": {
+            "auth": { "type": "noauth" },
+            "method": "POST",
+            "header": [
+              { "key": "Content-Type", "value": "application/json" }
+            ],
+            "body": {
+              "mode": "raw",
+              "raw": "{\n  \"username\": \"yash\",\n  \"password\": \"User@123\"\n}"
+            },
+            "url": {
+              "raw": "{{baseUrl}}/api/auth/login",
+              "host": ["{{baseUrl}}"],
+              "path": ["api", "auth", "login"]
+            }
+          }
+        },
+        {
           "name": "Login Error - Wrong Password (401)",
           "request": {
+            "auth": { "type": "noauth" },
             "method": "POST",
-            "header": [{ "key": "Content-Type", "value": "application/json" }],
+            "header": [
+              { "key": "Content-Type", "value": "application/json" }
+            ],
             "body": {
               "mode": "raw",
               "raw": "{\n  \"username\": \"admin\",\n  \"password\": \"WrongPass\"\n}"
@@ -120,11 +221,15 @@
       ]
     },
     {
-      "name": "3. Wayfinding & Routes (Intelligent Query Planner)",
+      "name": "3. Wayfinding & Routing (Dijkstra)",
       "item": [
         {
-          "name": "Auto-Plan: Cross-Floor Standard (Auto A*)",
+          "name": "Standard Route: Cross-Floor (Dijkstra)",
           "request": {
+            "auth": {
+              "type": "bearer",
+              "bearer": [{ "key": "token", "value": "{{token}}", "type": "string" }]
+            },
             "method": "GET",
             "header": [
               { "key": "Authorization", "value": "Bearer {{token}}" }
@@ -141,8 +246,12 @@
           }
         },
         {
-          "name": "Auto-Plan: Intra-Floor Same Level (Auto Floyd-Warshall O(1))",
+          "name": "Standard Route: Intra-Floor Same Level (Dijkstra)",
           "request": {
+            "auth": {
+              "type": "bearer",
+              "bearer": [{ "key": "token", "value": "{{token}}", "type": "string" }]
+            },
             "method": "GET",
             "header": [
               { "key": "Authorization", "value": "Bearer {{token}}" }
@@ -159,8 +268,12 @@
           }
         },
         {
-          "name": "Auto-Plan: Wheelchair Mode (Auto Dijkstra + MinHeap)",
+          "name": "Wheelchair Accessible Route (Dijkstra Accessible Filter)",
           "request": {
+            "auth": {
+              "type": "bearer",
+              "bearer": [{ "key": "token", "value": "{{token}}", "type": "string" }]
+            },
             "method": "GET",
             "header": [
               { "key": "Authorization", "value": "Bearer {{token}}" }
@@ -178,8 +291,12 @@
           }
         },
         {
-          "name": "Auto-Plan: Daytime Open Bridge (Auto Dijkstra @ 14:00)",
+          "name": "Time Filter: Daytime Open Bridge (Dijkstra @ 14:00)",
           "request": {
+            "auth": {
+              "type": "bearer",
+              "bearer": [{ "key": "token", "value": "{{token}}", "type": "string" }]
+            },
             "method": "GET",
             "header": [
               { "key": "Authorization", "value": "Bearer {{token}}" }
@@ -197,8 +314,12 @@
           }
         },
         {
-          "name": "Auto-Plan: Nighttime Closed Bridge (Auto Dijkstra @ 23:00 -> 404)",
+          "name": "Time Filter: Nighttime Closed Bridge (Dijkstra @ 23:00 -> 404)",
           "request": {
+            "auth": {
+              "type": "bearer",
+              "bearer": [{ "key": "token", "value": "{{token}}", "type": "string" }]
+            },
             "method": "GET",
             "header": [
               { "key": "Authorization", "value": "Bearer {{token}}" }
@@ -216,65 +337,12 @@
           }
         },
         {
-          "name": "Strategy Override: Force Dijkstra",
+          "name": "Nearest POI Route: Washroom from Reception",
           "request": {
-            "method": "GET",
-            "header": [
-              { "key": "Authorization", "value": "Bearer {{token}}" }
-            ],
-            "url": {
-              "raw": "{{baseUrl}}/api/route?start=1&end=17&algorithm=dijkstra",
-              "host": ["{{baseUrl}}"],
-              "path": ["api", "route"],
-              "query": [
-                { "key": "start", "value": "1" },
-                { "key": "end", "value": "17" },
-                { "key": "algorithm", "value": "dijkstra" }
-              ]
-            }
-          }
-        },
-        {
-          "name": "Strategy Override: Force A*",
-          "request": {
-            "method": "GET",
-            "header": [
-              { "key": "Authorization", "value": "Bearer {{token}}" }
-            ],
-            "url": {
-              "raw": "{{baseUrl}}/api/route?start=1&end=17&algorithm=astar",
-              "host": ["{{baseUrl}}"],
-              "path": ["api", "route"],
-              "query": [
-                { "key": "start", "value": "1" },
-                { "key": "end", "value": "17" },
-                { "key": "algorithm", "value": "astar" }
-              ]
-            }
-          }
-        },
-        {
-          "name": "Strategy Override: Force Hierarchical Floyd-Warshall",
-          "request": {
-            "method": "GET",
-            "header": [
-              { "key": "Authorization", "value": "Bearer {{token}}" }
-            ],
-            "url": {
-              "raw": "{{baseUrl}}/api/route?start=1&end=17&algorithm=hierarchical",
-              "host": ["{{baseUrl}}"],
-              "path": ["api", "route"],
-              "query": [
-                { "key": "start", "value": "1" },
-                { "key": "end", "value": "17" },
-                { "key": "algorithm", "value": "hierarchical" }
-              ]
-            }
-          }
-        },
-        {
-          "name": "Nearest Washroom POI",
-          "request": {
+            "auth": {
+              "type": "bearer",
+              "bearer": [{ "key": "token", "value": "{{token}}", "type": "string" }]
+            },
             "method": "GET",
             "header": [
               { "key": "Authorization", "value": "Bearer {{token}}" }
@@ -291,8 +359,12 @@
           }
         },
         {
-          "name": "Nearest Emergency Exit POI",
+          "name": "Nearest POI Route: Emergency Exit from Conference Hall",
           "request": {
+            "auth": {
+              "type": "bearer",
+              "bearer": [{ "key": "token", "value": "{{token}}", "type": "string" }]
+            },
             "method": "GET",
             "header": [
               { "key": "Authorization", "value": "Bearer {{token}}" }
@@ -309,8 +381,12 @@
           }
         },
         {
-          "name": "Multi-Stop Itinerary Route (TSP Heuristic)",
+          "name": "Multi-Stop Itinerary Route (TSP Heuristic + Dijkstra)",
           "request": {
+            "auth": {
+              "type": "bearer",
+              "bearer": [{ "key": "token", "value": "{{token}}", "type": "string" }]
+            },
             "method": "POST",
             "header": [
               { "key": "Authorization", "value": "Bearer {{token}}" },
@@ -326,6 +402,49 @@
               "path": ["api", "route", "multi-stop"]
             }
           }
+        },
+        {
+          "name": "Error Validation: Same Start and End Node (400)",
+          "request": {
+            "auth": {
+              "type": "bearer",
+              "bearer": [{ "key": "token", "value": "{{token}}", "type": "string" }]
+            },
+            "method": "GET",
+            "header": [
+              { "key": "Authorization", "value": "Bearer {{token}}" }
+            ],
+            "url": {
+              "raw": "{{baseUrl}}/api/route?start=1&end=1",
+              "host": ["{{baseUrl}}"],
+              "path": ["api", "route"],
+              "query": [
+                { "key": "start", "value": "1" },
+                { "key": "end", "value": "1" }
+              ]
+            }
+          }
+        },
+        {
+          "name": "Error Validation: Missing Parameters (400)",
+          "request": {
+            "auth": {
+              "type": "bearer",
+              "bearer": [{ "key": "token", "value": "{{token}}", "type": "string" }]
+            },
+            "method": "GET",
+            "header": [
+              { "key": "Authorization", "value": "Bearer {{token}}" }
+            ],
+            "url": {
+              "raw": "{{baseUrl}}/api/route?start=1",
+              "host": ["{{baseUrl}}"],
+              "path": ["api", "route"],
+              "query": [
+                { "key": "start", "value": "1" }
+              ]
+            }
+          }
         }
       ]
     },
@@ -335,6 +454,10 @@
         {
           "name": "Get Campus Analytics",
           "request": {
+            "auth": {
+              "type": "bearer",
+              "bearer": [{ "key": "token", "value": "{{token}}", "type": "string" }]
+            },
             "method": "GET",
             "header": [
               { "key": "Authorization", "value": "Bearer {{token}}" }
@@ -349,6 +472,10 @@
         {
           "name": "Temporarily Close Edge (Corridor/Bridge)",
           "request": {
+            "auth": {
+              "type": "bearer",
+              "bearer": [{ "key": "token", "value": "{{token}}", "type": "string" }]
+            },
             "method": "PATCH",
             "header": [
               { "key": "Authorization", "value": "Bearer {{token}}" },
@@ -368,6 +495,10 @@
         {
           "name": "Reopen Closed Edge",
           "request": {
+            "auth": {
+              "type": "bearer",
+              "bearer": [{ "key": "token", "value": "{{token}}", "type": "string" }]
+            },
             "method": "PATCH",
             "header": [
               { "key": "Authorization", "value": "Bearer {{token}}" },
@@ -387,6 +518,10 @@
         {
           "name": "Set Congestion Multiplier (Peak Traffic)",
           "request": {
+            "auth": {
+              "type": "bearer",
+              "bearer": [{ "key": "token", "value": "{{token}}", "type": "string" }]
+            },
             "method": "PATCH",
             "header": [
               { "key": "Authorization", "value": "Bearer {{token}}" },
@@ -404,8 +539,12 @@
           }
         },
         {
-          "name": "Toggle Edge Accessibility (Lift Maintenance)",
+          "name": "Toggle Edge Accessibility (Maintenance Mode)",
           "request": {
+            "auth": {
+              "type": "bearer",
+              "bearer": [{ "key": "token", "value": "{{token}}", "type": "string" }]
+            },
             "method": "PATCH",
             "header": [
               { "key": "Authorization", "value": "Bearer {{token}}" },
@@ -430,6 +569,10 @@
         {
           "name": "List All Nodes",
           "request": {
+            "auth": {
+              "type": "bearer",
+              "bearer": [{ "key": "token", "value": "{{token}}", "type": "string" }]
+            },
             "method": "GET",
             "header": [
               { "key": "Authorization", "value": "Bearer {{token}}" }
@@ -444,6 +587,10 @@
         {
           "name": "Get Node by ID",
           "request": {
+            "auth": {
+              "type": "bearer",
+              "bearer": [{ "key": "token", "value": "{{token}}", "type": "string" }]
+            },
             "method": "GET",
             "header": [
               { "key": "Authorization", "value": "Bearer {{token}}" }
@@ -452,6 +599,86 @@
               "raw": "{{baseUrl}}/api/nodes/1",
               "host": ["{{baseUrl}}"],
               "path": ["api", "nodes", "1"]
+            }
+          }
+        },
+        {
+          "name": "Create New Node (Admin Only)",
+          "event": [
+            {
+              "listen": "test",
+              "script": {
+                "exec": [
+                  "var jsonData = pm.response.json();",
+                  "if (jsonData.data && jsonData.data.id) {",
+                  "    pm.collectionVariables.set('createdNodeId', jsonData.data.id);",
+                  "    pm.environment.set('createdNodeId', jsonData.data.id);",
+                  "    console.log('Saved createdNodeId:', jsonData.data.id);",
+                  "}"
+                ],
+                "type": "text/javascript"
+              }
+            }
+          ],
+          "request": {
+            "auth": {
+              "type": "bearer",
+              "bearer": [{ "key": "token", "value": "{{token}}", "type": "string" }]
+            },
+            "method": "POST",
+            "header": [
+              { "key": "Authorization", "value": "Bearer {{token}}" },
+              { "key": "Content-Type", "value": "application/json" }
+            ],
+            "body": {
+              "mode": "raw",
+              "raw": "{\n  \"name\": \"Innovation Lab\",\n  \"floor\": 3,\n  \"building\": \"A\",\n  \"type\": \"room\"\n}"
+            },
+            "url": {
+              "raw": "{{baseUrl}}/api/nodes",
+              "host": ["{{baseUrl}}"],
+              "path": ["api", "nodes"]
+            }
+          }
+        },
+        {
+          "name": "Update Node (Admin Only)",
+          "request": {
+            "auth": {
+              "type": "bearer",
+              "bearer": [{ "key": "token", "value": "{{token}}", "type": "string" }]
+            },
+            "method": "PUT",
+            "header": [
+              { "key": "Authorization", "value": "Bearer {{token}}" },
+              { "key": "Content-Type", "value": "application/json" }
+            ],
+            "body": {
+              "mode": "raw",
+              "raw": "{\n  \"name\": \"AI & Robotics Innovation Lab\",\n  \"type\": \"lab\"\n}"
+            },
+            "url": {
+              "raw": "{{baseUrl}}/api/nodes/{{createdNodeId}}",
+              "host": ["{{baseUrl}}"],
+              "path": ["api", "nodes", "{{createdNodeId}}"]
+            }
+          }
+        },
+        {
+          "name": "Delete Node (Admin Only)",
+          "request": {
+            "auth": {
+              "type": "bearer",
+              "bearer": [{ "key": "token", "value": "{{token}}", "type": "string" }]
+            },
+            "method": "DELETE",
+            "header": [
+              { "key": "Authorization", "value": "Bearer {{token}}" }
+            ],
+            "url": {
+              "raw": "{{baseUrl}}/api/nodes/{{createdNodeId}}",
+              "host": ["{{baseUrl}}"],
+              "path": ["api", "nodes", "{{createdNodeId}}"]
             }
           }
         }
@@ -463,6 +690,10 @@
         {
           "name": "List All Edges",
           "request": {
+            "auth": {
+              "type": "bearer",
+              "bearer": [{ "key": "token", "value": "{{token}}", "type": "string" }]
+            },
             "method": "GET",
             "header": [
               { "key": "Authorization", "value": "Bearer {{token}}" }
@@ -477,6 +708,10 @@
         {
           "name": "Get Edge by ID",
           "request": {
+            "auth": {
+              "type": "bearer",
+              "bearer": [{ "key": "token", "value": "{{token}}", "type": "string" }]
+            },
             "method": "GET",
             "header": [
               { "key": "Authorization", "value": "Bearer {{token}}" }
@@ -487,15 +722,99 @@
               "path": ["api", "edges", "1"]
             }
           }
+        },
+        {
+          "name": "Create New Edge (Admin Only)",
+          "event": [
+            {
+              "listen": "test",
+              "script": {
+                "exec": [
+                  "var jsonData = pm.response.json();",
+                  "if (jsonData.data && jsonData.data.id) {",
+                  "    pm.collectionVariables.set('createdEdgeId', jsonData.data.id);",
+                  "    pm.environment.set('createdEdgeId', jsonData.data.id);",
+                  "    console.log('Saved createdEdgeId:', jsonData.data.id);",
+                  "}"
+                ],
+                "type": "text/javascript"
+              }
+            }
+          ],
+          "request": {
+            "auth": {
+              "type": "bearer",
+              "bearer": [{ "key": "token", "value": "{{token}}", "type": "string" }]
+            },
+            "method": "POST",
+            "header": [
+              { "key": "Authorization", "value": "Bearer {{token}}" },
+              { "key": "Content-Type", "value": "application/json" }
+            ],
+            "body": {
+              "mode": "raw",
+              "raw": "{\n  \"start_node\": 1,\n  \"end_node\": 3,\n  \"distance\": 12.5,\n  \"is_accessible\": true,\n  \"open_hours\": null,\n  \"congestion_weight\": 1.0\n}"
+            },
+            "url": {
+              "raw": "{{baseUrl}}/api/edges",
+              "host": ["{{baseUrl}}"],
+              "path": ["api", "edges"]
+            }
+          }
+        },
+        {
+          "name": "Update Edge (Admin Only)",
+          "request": {
+            "auth": {
+              "type": "bearer",
+              "bearer": [{ "key": "token", "value": "{{token}}", "type": "string" }]
+            },
+            "method": "PUT",
+            "header": [
+              { "key": "Authorization", "value": "Bearer {{token}}" },
+              { "key": "Content-Type", "value": "application/json" }
+            ],
+            "body": {
+              "mode": "raw",
+              "raw": "{\n  \"distance\": 11.0,\n  \"congestion_weight\": 1.2\n}"
+            },
+            "url": {
+              "raw": "{{baseUrl}}/api/edges/{{createdEdgeId}}",
+              "host": ["{{baseUrl}}"],
+              "path": ["api", "edges", "{{createdEdgeId}}"]
+            }
+          }
+        },
+        {
+          "name": "Delete Edge (Admin Only)",
+          "request": {
+            "auth": {
+              "type": "bearer",
+              "bearer": [{ "key": "token", "value": "{{token}}", "type": "string" }]
+            },
+            "method": "DELETE",
+            "header": [
+              { "key": "Authorization", "value": "Bearer {{token}}" }
+            ],
+            "url": {
+              "raw": "{{baseUrl}}/api/edges/{{createdEdgeId}}",
+              "host": ["{{baseUrl}}"],
+              "path": ["api", "edges", "{{createdEdgeId}}"]
+            }
+          }
         }
       ]
     },
     {
-      "name": "7. Points of Interest (POI)",
+      "name": "7. Points of Interest (POI) Management",
       "item": [
         {
           "name": "List All POIs",
           "request": {
+            "auth": {
+              "type": "bearer",
+              "bearer": [{ "key": "token", "value": "{{token}}", "type": "string" }]
+            },
             "method": "GET",
             "header": [
               { "key": "Authorization", "value": "Bearer {{token}}" }
@@ -504,6 +823,85 @@
               "raw": "{{baseUrl}}/api/poi",
               "host": ["{{baseUrl}}"],
               "path": ["api", "poi"]
+            }
+          }
+        },
+        {
+          "name": "Get Nearest POIs by Type (POI Metadata Lookup)",
+          "request": {
+            "auth": {
+              "type": "bearer",
+              "bearer": [{ "key": "token", "value": "{{token}}", "type": "string" }]
+            },
+            "method": "GET",
+            "header": [
+              { "key": "Authorization", "value": "Bearer {{token}}" }
+            ],
+            "url": {
+              "raw": "{{baseUrl}}/api/poi/nearest?node_id=1&type=washroom",
+              "host": ["{{baseUrl}}"],
+              "path": ["api", "poi", "nearest"],
+              "query": [
+                { "key": "node_id", "value": "1" },
+                { "key": "type", "value": "washroom" }
+              ]
+            }
+          }
+        },
+        {
+          "name": "Create New POI (Admin Only)",
+          "event": [
+            {
+              "listen": "test",
+              "script": {
+                "exec": [
+                  "var jsonData = pm.response.json();",
+                  "if (jsonData.data && jsonData.data.id) {",
+                  "    pm.collectionVariables.set('createdPoiId', jsonData.data.id);",
+                  "    pm.environment.set('createdPoiId', jsonData.data.id);",
+                  "    console.log('Saved createdPoiId:', jsonData.data.id);",
+                  "}"
+                ],
+                "type": "text/javascript"
+              }
+            }
+          ],
+          "request": {
+            "auth": {
+              "type": "bearer",
+              "bearer": [{ "key": "token", "value": "{{token}}", "type": "string" }]
+            },
+            "method": "POST",
+            "header": [
+              { "key": "Authorization", "value": "Bearer {{token}}" },
+              { "key": "Content-Type", "value": "application/json" }
+            ],
+            "body": {
+              "mode": "raw",
+              "raw": "{\n  \"node_id\": 2,\n  \"type\": \"information_desk\",\n  \"description\": \"Main floor customer information kiosk\"\n}"
+            },
+            "url": {
+              "raw": "{{baseUrl}}/api/poi",
+              "host": ["{{baseUrl}}"],
+              "path": ["api", "poi"]
+            }
+          }
+        },
+        {
+          "name": "Delete POI (Admin Only)",
+          "request": {
+            "auth": {
+              "type": "bearer",
+              "bearer": [{ "key": "token", "value": "{{token}}", "type": "string" }]
+            },
+            "method": "DELETE",
+            "header": [
+              { "key": "Authorization", "value": "Bearer {{token}}" }
+            ],
+            "url": {
+              "raw": "{{baseUrl}}/api/poi/{{createdPoiId}}",
+              "host": ["{{baseUrl}}"],
+              "path": ["api", "poi", "{{createdPoiId}}"]
             }
           }
         }
